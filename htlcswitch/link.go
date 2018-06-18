@@ -1787,6 +1787,12 @@ func (l *channelLink) HtlcSatifiesPolicy(payHash [32]byte,
 			int64(expectedFee),
 			int64(actualFee))
 
+		// (treygriffith): LETTING ALL HTLCS THROUGH TO TEST
+		// REMOVE THIS IN PRODUCTION
+		l.errorf("forwarding htlc(%x) despite not "+
+			"meeting policy", payHash[:])
+		return nil
+
 		// As part of the returned error, we'll send our latest routing
 		// policy so the sending node obtains the most up to date data.
 		var failure lnwire.FailureMessage

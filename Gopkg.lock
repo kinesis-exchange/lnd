@@ -187,6 +187,41 @@
   revision = "e5ab5d7396020384f864452ec3c69b56264f1092"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/lightningnetwork/lnd"
+  packages = [
+    "aezeed",
+    "autopilot",
+    "brontide",
+    "chainntnfs",
+    "chainntnfs/bitcoindnotify",
+    "chainntnfs/btcdnotify",
+    "chainntnfs/neutrinonotify",
+    "channeldb",
+    "contractcourt",
+    "discovery",
+    "htlcswitch",
+    "htlcswitch/hodl",
+    "keychain",
+    "lnpeer",
+    "lnrpc",
+    "lntest",
+    "lnwallet",
+    "lnwallet/btcwallet",
+    "lnwire",
+    "macaroons",
+    "multimutex",
+    "nat",
+    "routing",
+    "routing/chainview",
+    "shachain",
+    "tor",
+    "walletunlocker",
+    "zpay32"
+  ]
+  revision = "fc658dbf6043951f6ba8b8e86f4e67bc903cf6b7"
+
+[[projects]]
   name = "github.com/ltcsuite/ltcd"
   packages = [
     "btcjson",
@@ -404,6 +439,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "dc40dd185a90b723e4b3df4a077b4ad4f99648260661cac9d58121e8bd3474ef"
+  inputs-digest = "660d64b1057bdf4dd992d8383589916d72c1497994ffbc52330c4a1f0f93a89d"
   solver-name = "gps-cdcl"
   solver-version = 1
