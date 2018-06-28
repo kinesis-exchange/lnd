@@ -115,6 +115,12 @@
   revision = "a6af135bd4e28680facf08a3d206b454abc877a4"
 
 [[projects]]
+  name = "github.com/golang/mock"
+  packages = ["gomock"]
+  revision = "c34cdb4725f4c3844d095133c6e40e448b86589b"
+  version = "v1.1.1"
+
+[[projects]]
   name = "github.com/golang/protobuf"
   packages = [
     "jsonpb",
@@ -203,6 +209,12 @@
     "internal/socket"
   ]
   revision = "79bfde677fa81ff8d27c4330c35bda075d360641"
+
+[[projects]]
+  name = "github.com/processout/grpc-go-pool"
+  packages = ["."]
+  revision = "6f31a97b80d10a7bbefa392828d1a7f1b50a40fa"
+  version = "v1.2"
 
 [[projects]]
   name = "github.com/roasbeef/btcd"
@@ -404,6 +416,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "dc40dd185a90b723e4b3df4a077b4ad4f99648260661cac9d58121e8bd3474ef"
+  inputs-digest = "85543822e0de24ad5fcfab2cff7a68f48b1581f90cae93a815741a151105d004"
   solver-name = "gps-cdcl"
   solver-version = 1

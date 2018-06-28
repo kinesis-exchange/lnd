@@ -140,6 +140,10 @@ type bitcoindConfig struct {
 	ZMQPath string `long:"zmqpath" description:"The path to the ZMQ socket providing at least raw blocks. Raw transactions can be handled as well."`
 }
 
+type extpreimageConfig struct {
+	RPCHost string `long:"rpchost" description:"The external preimage service's gRPC listening address."`
+}
+
 type autoPilotConfig struct {
 	Active         bool    `long:"active" description:"If the autopilot agent should be active or not."`
 	MaxChannels    int     `long:"maxchannels" description:"The maximum number of channels that should be created"`
@@ -166,20 +170,20 @@ type torConfig struct {
 type config struct {
 	ShowVersion bool `short:"V" long:"version" description:"Display version information and exit"`
 
-	LndDir           string   `long:"lnddir" description:"The base directory that contains lnd's data, logs, configuration file, etc."`
-	ConfigFile       string   `long:"C" long:"configfile" description:"Path to configuration file"`
-	DataDir          string   `short:"b" long:"datadir" description:"The directory to store lnd's data within"`
-	TLSCertPath      string   `long:"tlscertpath" description:"Path to write the TLS certificate for lnd's RPC and REST services"`
-	TLSKeyPath       string   `long:"tlskeypath" description:"Path to write the TLS private key for lnd's RPC and REST services"`
-	TLSExtraIP       string   `long:"tlsextraip" description:"Adds an extra ip to the generated certificate"`
-	TLSExtraDomain   string   `long:"tlsextradomain" description:"Adds an extra domain to the generated certificate"`
-	NoMacaroons      bool     `long:"no-macaroons" description:"Disable macaroon authentication"`
-	AdminMacPath     string   `long:"adminmacaroonpath" description:"Path to write the admin macaroon for lnd's RPC and REST services if it doesn't exist"`
-	ReadMacPath      string   `long:"readonlymacaroonpath" description:"Path to write the read-only macaroon for lnd's RPC and REST services if it doesn't exist"`
-	InvoiceMacPath   string   `long:"invoicemacaroonpath" description:"Path to the invoice-only macaroon for lnd's RPC and REST services if it doesn't exist"`
-	LogDir           string   `long:"logdir" description:"Directory to log output."`
-	MaxLogFiles      int      `long:"maxlogfiles" description:"Maximum logfiles to keep (0 for no rotation)"`
-	MaxLogFileSize   int      `long:"maxlogfilesize" description:"Maximum logfile size in MB"`
+	LndDir         string `long:"lnddir" description:"The base directory that contains lnd's data, logs, configuration file, etc."`
+	ConfigFile     string `long:"C" long:"configfile" description:"Path to configuration file"`
+	DataDir        string `short:"b" long:"datadir" description:"The directory to store lnd's data within"`
+	TLSCertPath    string `long:"tlscertpath" description:"Path to write the TLS certificate for lnd's RPC and REST services"`
+	TLSKeyPath     string `long:"tlskeypath" description:"Path to write the TLS private key for lnd's RPC and REST services"`
+	TLSExtraIP     string `long:"tlsextraip" description:"Adds an extra ip to the generated certificate"`
+	TLSExtraDomain string `long:"tlsextradomain" description:"Adds an extra domain to the generated certificate"`
+	NoMacaroons    bool   `long:"no-macaroons" description:"Disable macaroon authentication"`
+	AdminMacPath   string `long:"adminmacaroonpath" description:"Path to write the admin macaroon for lnd's RPC and REST services if it doesn't exist"`
+	ReadMacPath    string `long:"readonlymacaroonpath" description:"Path to write the read-only macaroon for lnd's RPC and REST services if it doesn't exist"`
+	InvoiceMacPath string `long:"invoicemacaroonpath" description:"Path to the invoice-only macaroon for lnd's RPC and REST services if it doesn't exist"`
+	LogDir         string `long:"logdir" description:"Directory to log output."`
+	MaxLogFiles    int    `long:"maxlogfiles" description:"Maximum logfiles to keep (0 for no rotation)"`
+	MaxLogFileSize int    `long:"maxlogfilesize" description:"Maximum logfile size in MB"`
 
 	// We'll parse these 'raw' string arguments into real net.Addrs in the
 	// loadConfig function. We need to expose the 'raw' strings so the
@@ -193,8 +197,8 @@ type config struct {
 	RESTListeners    []net.Addr
 	Listeners        []net.Addr
 	ExternalIPs      []net.Addr
-	DisableListen    bool     `long:"nolisten" description:"Disable listening for incoming peer connections"`
-	NAT              bool     `long:"nat" description:"Toggle NAT traversal support (using either UPnP or NAT-PMP) to automatically advertise your external IP address to the network -- NOTE this does not support devices behind multiple NATs"`
+	DisableListen    bool `long:"nolisten" description:"Disable listening for incoming peer connections"`
+	NAT              bool `long:"nat" description:"Toggle NAT traversal support (using either UPnP or NAT-PMP) to automatically advertise your external IP address to the network -- NOTE this does not support devices behind multiple NATs"`
 
 	DebugLevel string `short:"d" long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 
@@ -215,6 +219,8 @@ type config struct {
 	Litecoin      *chainConfig    `group:"Litecoin" namespace:"litecoin"`
 	LtcdMode      *btcdConfig     `group:"ltcd" namespace:"ltcd"`
 	LitecoindMode *bitcoindConfig `group:"litecoind" namespace:"litecoind"`
+
+	Extpreimage *extpreimageConfig `group:"Extpreimage" namespace:"extpreimage"`
 
 	Autopilot *autoPilotConfig `group:"Autopilot" namespace:"autopilot"`
 
@@ -854,7 +860,7 @@ func loadConfig() (*config, error) {
 	// that.
 	for _, p2pListener := range cfg.Listeners {
 		if lncfg.IsUnix(p2pListener) {
-			err := fmt.Errorf("unix socket addresses cannot be " +
+			err := fmt.Errorf("unix socket addresses cannot be "+
 				"used for the p2p connection listener: %s",
 				p2pListener)
 			return nil, err
