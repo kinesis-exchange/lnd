@@ -2405,25 +2405,50 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 	invoice *lnrpc.Invoice) (*lnrpc.AddInvoiceResponse, error) {
 
 	var paymentPreimage [32]byte
+	var rHash [sha256.Size]byte
 
-	switch {
-	// If a preimage wasn't specified, then we'll generate a new preimage
-	// from fresh cryptographic randomness.
-	case len(invoice.RPreimage) == 0:
-		if _, err := rand.Read(paymentPreimage[:]); err != nil {
-			return nil, err
+	if invoice.ExternalPreimage {
+		// If the preimage is defined externally, no preimage can be defined
+		switch {
+		// A preimage cannot be stored externally and passed to the internal
+		// system.
+		case len(invoice.RPreimage) != 0:
+			return nil, fmt.Errorf("payment preimage cannot be defined " +
+				"if using an external preimage.")
+		// A SHA256 hash of the preimage is required if it is to be defined
+		// externally.
+		case len(invoice.RHash) != sha256.Size:
+			return nil, fmt.Errorf("payment hash must be exactly %v bytes "+
+				"for external preimages, is instead %v bytes", sha256.Size,
+				len(invoice.RHash))
+
+		// If the hash is well-defined, we'll use it
+		default:
+			copy(rHash[:], invoice.RHash[:])
+		}
+	} else {
+		switch {
+		// If a preimage wasn't specified, then we'll generate a new preimage
+		// from fresh cryptographic randomness.
+		case len(invoice.RPreimage) == 0:
+			if _, err := rand.Read(paymentPreimage[:]); err != nil {
+				return nil, err
+			}
+
+		// Otherwise, if a preimage was specified, then it MUST be exactly
+		// 32-bytes.
+		case len(invoice.RPreimage) > 0 && len(invoice.RPreimage) != 32:
+			return nil, fmt.Errorf("payment preimage must be exactly "+
+				"32 bytes, is instead %v", len(invoice.RPreimage))
+
+		// If the preimage meets the size specifications, then it can be used
+		// as is and will define the hash.
+		default:
+			copy(paymentPreimage[:], invoice.RPreimage[:])
 		}
 
-	// Otherwise, if a preimage was specified, then it MUST be exactly
-	// 32-bytes.
-	case len(invoice.RPreimage) > 0 && len(invoice.RPreimage) != 32:
-		return nil, fmt.Errorf("payment preimage must be exactly "+
-			"32 bytes, is instead %v", len(invoice.RPreimage))
-
-	// If the preimage meets the size specifications, then it can be used
-	// as is.
-	default:
-		copy(paymentPreimage[:], invoice.RPreimage[:])
+		computedHash := sha256.Sum256(paymentPreimage[:])
+		copy(rHash[:], computedHash[:])
 	}
 
 	// The size of the memo, receipt and description hash attached must not
@@ -2450,10 +2475,6 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		return nil, fmt.Errorf("payment of %v is too large, max "+
 			"payment allowed is %v", amt, maxPaymentMSat.ToSatoshis())
 	}
-
-	// Next, generate the payment hash itself from the preimage. This will
-	// be used by clients to query for the state of a particular invoice.
-	rHash := sha256.Sum256(paymentPreimage[:])
 
 	// We also create an encoded payment request which allows the
 	// caller to compactly send the invoice to the payer. We'll create a
@@ -2690,6 +2711,13 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 			err)
 	}
 
+	var paymentHash []byte
+	if invoice.Terms.ExternalPreimage {
+		paymentHash = invoice.Terms.PaymentHash[:]
+	} else {
+		paymentHash = decoded.PaymentHash[:]
+	}
+
 	descHash := []byte("")
 	if decoded.DescriptionHash != nil {
 		descHash = decoded.DescriptionHash[:]
@@ -2719,20 +2747,21 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 	satAmt := invoice.Terms.Value.ToSatoshis()
 
 	return &lnrpc.Invoice{
-		Memo:            string(invoice.Memo[:]),
-		Receipt:         invoice.Receipt[:],
-		RHash:           decoded.PaymentHash[:],
-		RPreimage:       preimage[:],
-		Value:           int64(satAmt),
-		CreationDate:    invoice.CreationDate.Unix(),
-		SettleDate:      settleDate,
-		Settled:         invoice.Terms.Settled,
-		PaymentRequest:  paymentRequest,
-		DescriptionHash: descHash,
-		Expiry:          expiry,
-		CltvExpiry:      cltvExpiry,
-		FallbackAddr:    fallbackAddr,
-		RouteHints:      routeHints,
+		Memo:             string(invoice.Memo[:]),
+		Receipt:          invoice.Receipt[:],
+		ExternalPreimage: invoice.Terms.ExternalPreimage,
+		RHash:            paymentHash,
+		RPreimage:        preimage[:],
+		Value:            int64(satAmt),
+		CreationDate:     invoice.CreationDate.Unix(),
+		SettleDate:       settleDate,
+		Settled:          invoice.Terms.Settled,
+		PaymentRequest:   paymentRequest,
+		DescriptionHash:  descHash,
+		Expiry:           expiry,
+		CltvExpiry:       cltvExpiry,
+		FallbackAddr:     fallbackAddr,
+		RouteHints:       routeHints,
 	}, nil
 }
 

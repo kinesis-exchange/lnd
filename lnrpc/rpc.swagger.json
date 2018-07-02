@@ -1893,6 +1893,11 @@
           "type": "boolean",
           "format": "boolean",
           "description": "/ Whether this invoice should include routing hints for private channels."
+        },
+        "external_preimage": {
+          "type": "boolean",
+          "format": "boolean",
+          "title": "/ Whether the preimage for this invoice is defined locally or stored externally"
         }
       }
     },
