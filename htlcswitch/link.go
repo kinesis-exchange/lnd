@@ -13,6 +13,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contractcourt"
+	"github.com/lightningnetwork/lnd/extpreimage"
 	"github.com/lightningnetwork/lnd/htlcswitch/hodl"
 	"github.com/lightningnetwork/lnd/lnpeer"
 	"github.com/lightningnetwork/lnd/lnwallet"
@@ -183,6 +184,10 @@ type ChannelLinkConfig struct {
 	// witnesses that we discover which will notify any sub-systems
 	// subscribed to new events.
 	PreimageCache contractcourt.WitnessBeacon
+
+	// ExtpreimageClient is a client to query an server that
+	// holds preimages for invoices that are marked as ExternalPreimage
+	ExtpreimageClient extpreimage.Client
 
 	// OnChannelFailure is a function closure that we'll call if the
 	// channel failed for some reason. Depending on the severity of the

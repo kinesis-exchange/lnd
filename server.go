@@ -23,6 +23,7 @@ import (
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contractcourt"
 	"github.com/lightningnetwork/lnd/discovery"
+	"github.com/lightningnetwork/lnd/extpreimage"
 	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/lncfg"
 	"github.com/lightningnetwork/lnd/lnpeer"
@@ -93,6 +94,10 @@ type server struct {
 	// authenticating the connection to the Tor server, automatically
 	// creating and setting up onion services, etc.
 	torController *tor.Controller
+
+	// extpreimageClient is a client that communicates with a server
+	// responsible for fetching preimages that are stored offsite.
+	extpreimageClient extpreimage.Client
 
 	// natTraversal is the specific NAT traversal technique used to
 	// automatically set up port forwarding rules in order to advertise to
@@ -275,6 +280,19 @@ func newServer(listenAddrs []net.Addr, chanDB *channeldb.DB, cc *chainControl,
 		invoices:    s.invoices,
 		wCache:      chanDB.NewWitnessCache(),
 		subscribers: make(map[uint64]*preimageSubscriber),
+	}
+
+	// Set up the External Preimage client if one is set to
+	// allow us to query for preimages from the external service
+	if cfg.Extpreimage.RPCHost != "" {
+		srvrLog.Infof("Creating extpreimage client for %v",
+			cfg.Extpreimage.RPCHost)
+		s.extpreimageClient, err = extpreimage.New(extpreimage.DefaultRPC(),
+			cfg.Extpreimage.RPCHost)
+		if err != nil {
+			srvrLog.Errorf("Could not create extpreimageClient: %v", err)
+			return nil, err
+		}
 	}
 
 	// If the debug HTLC flag is on, then we invoice a "master debug"
@@ -808,6 +826,12 @@ func (s *server) Stop() error {
 	s.cc.chainView.Stop()
 	s.connMgr.Stop()
 	s.cc.feeEstimator.Stop()
+
+	// If the extpreimage service was set up, we need to shutdown
+	// any outstanding connections to it.
+	if s.extpreimageClient != nil {
+		s.extpreimageClient.Stop()
+	}
 
 	// Disconnect from each active peers to ensure that
 	// peerTerminationWatchers signal completion to each peer.
