@@ -2302,7 +2302,36 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 				continue
 			}
 
-			preimage := invoice.Terms.PaymentPreimage
+			var preimage [32]byte
+
+			// if the invoice defines an External Preimage, make request to the
+			// external preimage service to retrieve it.
+			if invoice.Terms.ExternalPreimage {
+				if l.cfg.ExtpreimageClient == nil {
+					l.fail(LinkFailureError{code: ErrInternalError},
+						"no extpreimage client configured")
+					return false
+				}
+
+				preimageRequest := &extpreimage.PreimageRequest{
+					PaymentHash: invoice.Terms.PaymentHash,
+					Amount:      int64(invoice.Terms.Value.ToSatoshis()),
+					TimeLock:    pd.Timeout,
+					BestHeight:  heightNow,
+				}
+
+				var err error
+				preimage, err = l.cfg.ExtpreimageClient.Retrieve(preimageRequest)
+
+				if err != nil {
+					l.fail(LinkFailureError{code: ErrInternalError},
+						"unable to retrieve external invoice: %v", err)
+					return false
+				}
+			} else {
+				preimage = invoice.Terms.PaymentPreimage
+			}
+
 			err = l.channel.SettleHTLC(preimage,
 				pd.HtlcIndex, pd.SourceRef, nil, nil)
 			if err != nil {

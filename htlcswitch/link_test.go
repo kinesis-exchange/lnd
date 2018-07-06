@@ -19,6 +19,7 @@ import (
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contractcourt"
+	"github.com/lightningnetwork/lnd/extpreimage"
 	"github.com/lightningnetwork/lnd/htlcswitch/hodl"
 	"github.com/lightningnetwork/lnd/lnpeer"
 	"github.com/lightningnetwork/lnd/lnwallet"
@@ -482,6 +483,112 @@ func TestChannelLinkMultiHopPayment(t *testing.T) {
 	if expectedCarolBandwidth != n.carolChannelLink.Bandwidth() {
 		t.Fatalf("channel bandwidth incorrect: expected %v, got %v",
 			expectedCarolBandwidth, n.carolChannelLink.Bandwidth())
+	}
+}
+
+// mockExtpreimageClient is a mock client that conforms to the
+// extpreimage.Client interface for testing retrieval of preimages
+type mockExtpreimageClient struct {
+	extpreimage.Client
+	preimage [32]byte
+}
+
+func (c *mockExtpreimageClient) Retrieve(*extpreimage.PreimageRequest) (
+	[32]byte, error) {
+	time.Sleep(100 * time.Millisecond)
+	return c.preimage, nil
+}
+
+// TestChannelLinkExternalPreimagePayment tests that when an exit node receives
+// an incoming HTLC for which the invoice has an external preimage (i.e. has
+// ExternalPreimage set to true) that it successfully calls the external
+// preimage service to retrieve the preimage.
+func TestChannelLinkExternalPreimagePayment(t *testing.T) {
+	t.Parallel()
+
+	channels, cleanUp, _, err := createClusterChannels(
+		btcutil.SatoshiPerBitcoin*3,
+		btcutil.SatoshiPerBitcoin*5)
+	if err != nil {
+		t.Fatalf("unable to create channel: %v", err)
+	}
+	defer cleanUp()
+
+	n := newThreeHopNetwork(t, channels.aliceToBob, channels.bobToAlice,
+		channels.bobToCarol, channels.carolToBob, testStartingHeight)
+	if err := n.start(); err != nil {
+		t.Fatal(err)
+	}
+	defer n.stop()
+
+	aliceBandwidthBefore := n.aliceChannelLink.Bandwidth()
+	bobBandwidthBefore := n.firstBobChannelLink.Bandwidth()
+
+	var preimage [32]byte
+	r, err := generateRandomBytes(32)
+	if err != nil {
+		t.Fatalf("unable to generate preimage: %v", err)
+	}
+	copy(preimage[:], r)
+
+	// set the external preimage client on bob's channel
+	n.firstBobChannelLink.cfg.ExtpreimageClient = &mockExtpreimageClient{
+		preimage: preimage,
+	}
+
+	debug := false
+	if debug {
+		// Log message that alice receives.
+		n.aliceServer.intersect(createLogFunc("alice",
+			n.aliceChannelLink.ChanID()))
+
+		// Log message that bob receives.
+		n.bobServer.intersect(createLogFunc("bob",
+			n.firstBobChannelLink.ChanID()))
+	}
+
+	amount := lnwire.NewMSatFromSatoshis(btcutil.SatoshiPerBitcoin)
+	htlcAmt, totalTimelock, hops := generateHops(amount, testStartingHeight,
+		n.firstBobChannelLink)
+
+	// Wait for:
+	// * HTLC add request to be sent to bob.
+	// * alice<->bob commitment state to be updated.
+	// * settle request to be sent back from bob to alice.
+	// * alice<->bob commitment state to be updated.
+	// * user notification to be sent.
+	receiver := n.bobServer
+	rhash, err := n.makeExtpreimagePayment(n.aliceServer, receiver,
+		n.bobServer.PubKey(), hops, amount, htlcAmt,
+		totalTimelock, preimage).Wait(30 * time.Second)
+	if err != nil {
+		t.Fatalf("unable to make the payment: %v", err)
+	}
+
+	// Wait for Bob to receive the revocation.
+	//
+	// TODO(roasbeef); replace with select over returned err chan
+	time.Sleep(100 * time.Millisecond)
+
+	// Check that alice invoice was settled and bandwidth of HTLC
+	// links was changed.
+	invoice, err := receiver.registry.LookupInvoice(rhash)
+	if err != nil {
+		t.Fatalf("unable to get invoice: %v", err)
+	}
+	if !invoice.Terms.Settled {
+		t.Fatal("alice invoice wasn't settled")
+	}
+
+	if aliceBandwidthBefore-amount != n.aliceChannelLink.Bandwidth() {
+		t.Fatal("alice bandwidth should have decrease on payment " +
+			"amount")
+	}
+
+	if bobBandwidthBefore+amount != n.firstBobChannelLink.Bandwidth() {
+		t.Fatalf("bob bandwidth isn't match: expected %v, got %v",
+			bobBandwidthBefore+amount,
+			n.firstBobChannelLink.Bandwidth())
 	}
 }
 
