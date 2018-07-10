@@ -504,10 +504,12 @@ func loadConfig() (*config, error) {
 			"litecoin.active must be set to 1 (true)", funcName)
 
 	case cfg.Litecoin.Active:
+		// NOTE(dannypaz): Current lightning-labs/lnd code does not
+		// support siment on ltc
 		if cfg.Litecoin.SimNet {
-			str := "%s: simnet mode for litecoin not currently supported"
-			return nil, fmt.Errorf(str, funcName)
+			fmt.Printf("%s: Connecting to experimental litecoin simnet\n", funcName)
 		}
+
 		if cfg.Litecoin.RegTest {
 			str := "%s: regnet mode for litecoin not currently supported"
 			return nil, fmt.Errorf(str, funcName)
@@ -530,6 +532,12 @@ func loadConfig() (*config, error) {
 		if cfg.Litecoin.TestNet3 {
 			numNets++
 			ltcParams = litecoinTestNetParams
+		}
+		// NOTE(dannypaz): Current lightning-labs/lnd code does not
+		// support siment on ltc
+		if cfg.Litecoin.SimNet {
+			numNets++
+			ltcParams = litecoinSimNetParams
 		}
 		if numNets > 1 {
 			str := "%s: The mainnet, testnet, and simnet params " +

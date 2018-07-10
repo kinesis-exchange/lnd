@@ -28,8 +28,8 @@ import (
 	"github.com/roasbeef/btcd/rpcclient"
 	"github.com/roasbeef/btcutil"
 	"github.com/roasbeef/btcwallet/chain"
-	"github.com/roasbeef/btcwallet/walletdb"
 	"github.com/roasbeef/btcwallet/wallet"
+	"github.com/roasbeef/btcwallet/walletdb"
 )
 
 const (

@@ -1036,7 +1036,7 @@ func waitForWalletPassword(grpcEndpoints, restEndpoints []net.Addr,
 			// Don't leave the file open in case the new wallet
 			// could not be created for whatever reason.
 			if err := loader.UnloadWallet(); err != nil {
-				ltndLog.Errorf("Could not unload new " +
+				ltndLog.Errorf("Could not unload new "+
 					"wallet: %v", err)
 			}
 			return nil, err
