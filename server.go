@@ -285,10 +285,10 @@ func newServer(listenAddrs []net.Addr, chanDB *channeldb.DB, cc *chainControl,
 	// Set up the External Preimage client if one is set to
 	// allow us to query for preimages from the external service
 	if cfg.Extpreimage.RPCHost != "" {
-		srvrLog.Infof("Creating extpreimage client for %v",
-			cfg.Extpreimage.RPCHost)
+		srvrLog.Infof("Creating extpreimage client for %v on %v",
+			cfg.Extpreimage.RPCHost, registeredChains.PrimaryChain().String())
 		s.extpreimageClient, err = extpreimage.New(extpreimage.DefaultRPC(),
-			cfg.Extpreimage.RPCHost)
+			cfg.Extpreimage.RPCHost, registeredChains.PrimaryChain().String())
 		if err != nil {
 			srvrLog.Errorf("Could not create extpreimageClient: %v", err)
 			return nil, err

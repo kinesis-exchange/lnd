@@ -692,7 +692,13 @@ func (i *mockInvoiceRegistry) AddInvoice(invoice channeldb.Invoice) error {
 	i.Lock()
 	defer i.Unlock()
 
-	rhash := fastsha256.Sum256(invoice.Terms.PaymentPreimage[:])
+	var rhash [sha256.Size]byte
+	if invoice.Terms.ExternalPreimage {
+		rhash = invoice.Terms.PaymentHash
+	} else {
+		rhash = fastsha256.Sum256(invoice.Terms.PaymentPreimage[:])
+	}
+
 	i.invoices[chainhash.Hash(rhash)] = invoice
 
 	return nil

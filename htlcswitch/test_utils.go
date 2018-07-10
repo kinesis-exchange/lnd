@@ -546,6 +546,33 @@ func generatePayment(invoiceAmt, htlcAmt lnwire.MilliSatoshi, timelock uint32,
 	return invoice, htlc, nil
 }
 
+// generateExtpreimagePayment is a copy of generatePayment that uses external preimages
+// so that that functionality can be tested while keeping diffs with upstream contained.
+func generateExtpreimagePayment(invoiceAmt, htlcAmt lnwire.MilliSatoshi, timelock uint32,
+	preimage [32]byte, blob [lnwire.OnionPacketSize]byte) (*channeldb.Invoice,
+	*lnwire.UpdateAddHTLC, error) {
+
+	rhash := fastsha256.Sum256(preimage[:])
+
+	invoice := &channeldb.Invoice{
+		CreationDate: time.Now(),
+		Terms: channeldb.ContractTerm{
+			Value:            invoiceAmt,
+			ExternalPreimage: true,
+			PaymentHash:      rhash,
+		},
+	}
+
+	htlc := &lnwire.UpdateAddHTLC{
+		PaymentHash: rhash,
+		Amount:      htlcAmt,
+		Expiry:      timelock,
+		OnionBlob:   blob,
+	}
+
+	return invoice, htlc, nil
+}
+
 // generateRoute generates the path blob by given array of peers.
 func generateRoute(hops ...ForwardingInfo) ([lnwire.OnionPacketSize]byte, error) {
 	var blob [lnwire.OnionPacketSize]byte
@@ -698,6 +725,64 @@ func (n *threeHopNetwork) makePayment(sendingPeer, receivingPeer lnpeer.Peer,
 		}
 	}
 	rhash = fastsha256.Sum256(invoice.Terms.PaymentPreimage[:])
+
+	// Check who is last in the route and add invoice to server registry.
+	if err := receiver.registry.AddInvoice(*invoice); err != nil {
+		paymentErr <- err
+		return &paymentResponse{
+			rhash: rhash,
+			err:   paymentErr,
+		}
+	}
+
+	// Send payment and expose err channel.
+	go func() {
+		_, err := sender.htlcSwitch.SendHTLC(firstHopPub, htlc,
+			newMockDeobfuscator())
+		paymentErr <- err
+	}()
+
+	return &paymentResponse{
+		rhash: rhash,
+		err:   paymentErr,
+	}
+}
+
+// makeExtpreimagePayment is a copy of makePayment for external preimages
+// to enable testing while keeping diffs with upstream contained.
+func (n *threeHopNetwork) makeExtpreimagePayment(sendingPeer,
+	receivingPeer lnpeer.Peer, firstHopPub [33]byte, hops []ForwardingInfo,
+	invoiceAmt, htlcAmt lnwire.MilliSatoshi, timelock uint32,
+	preimage [32]byte) *paymentResponse {
+
+	paymentErr := make(chan error, 1)
+
+	var rhash chainhash.Hash
+
+	sender := sendingPeer.(*mockServer)
+	receiver := receivingPeer.(*mockServer)
+
+	// Generate route convert it to blob, and return next destination for
+	// htlc add request.
+	blob, err := generateRoute(hops...)
+	if err != nil {
+		paymentErr <- err
+		return &paymentResponse{
+			rhash: rhash,
+			err:   paymentErr,
+		}
+	}
+
+	// Generate payment: invoice and htlc.
+	invoice, htlc, err := generateExtpreimagePayment(invoiceAmt, htlcAmt, timelock, preimage, blob)
+	if err != nil {
+		paymentErr <- err
+		return &paymentResponse{
+			rhash: rhash,
+			err:   paymentErr,
+		}
+	}
+	rhash = invoice.Terms.PaymentHash
 
 	// Check who is last in the route and add invoice to server registry.
 	if err := receiver.registry.AddInvoice(*invoice); err != nil {
