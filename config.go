@@ -507,7 +507,6 @@ func loadConfig() (*config, error) {
 		// NOTE(dannypaz): Current lightning-labs/lnd code does not
 		// support siment on ltc
 		if cfg.Litecoin.SimNet {
-			str := "%s: simnet mode for litecoin not currently supported"
 			fmt.Printf("%s: Connecting to experimental litecoin simnet\n", funcName)
 		}
 

@@ -70,12 +70,12 @@ var litecoinMainNetParams = litecoinNetParams{
 	CoinType: keychain.CoinTypeLitecoin,
 }
 
-
 // litecoinSimNetParams contains parameters specific to the simulation test
 // network.
 //
 // NOTE(dannypaz): Current lightning-labs/lnd code does not support
 // siment on ltc, however ltcd has param information for this setup
+// see: https://github.com/ltcsuite/ltcd/blob/master/chaincfg/params.go
 var litecoinSimNetParams = litecoinNetParams{
 	Params:   &litecoinCfg.SimNetParams,
 	rpcPort:  "18556",
