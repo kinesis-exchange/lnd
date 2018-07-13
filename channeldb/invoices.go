@@ -330,6 +330,33 @@ func (d *DB) SettleInvoice(paymentHash [32]byte) error {
 	})
 }
 
+// addInvoicePreimage attempts to update an invoice with an External Preimage
+// to save that preimage locally, allowing us to re-use it for duplicate
+// payments and provide it to listeners via LookupInvoice. If an invoice
+// matching this hash does not exist, it will fail with a "not found" error.
+func (d *DB) AddInvoicePreimage(paymentHash [32]byte,
+	paymentPreimage [32]byte) error {
+	return d.Update(func(tx *bolt.Tx) error {
+		invoices, err := tx.CreateBucketIfNotExists(invoiceBucket)
+		if err != nil {
+			return err
+		}
+		invoiceIndex, err := invoices.CreateBucketIfNotExists(invoiceIndexBucket)
+		if err != nil {
+			return err
+		}
+
+		// Check the invoice index to see if an invoice paying to this
+		// hash exists within the DB.
+		invoiceNum := invoiceIndex.Get(paymentHash[:])
+		if invoiceNum == nil {
+			return ErrInvoiceNotFound
+		}
+
+		return addInvoicePreimage(invoices, invoiceNum, paymentPreimage)
+	})
+}
+
 func putInvoice(invoices *bolt.Bucket, invoiceIndex *bolt.Bucket,
 	i *Invoice, invoiceNum uint32) error {
 
@@ -397,14 +424,9 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 		return err
 	}
 
-	var preimage [32]byte
-	if !i.Terms.ExternalPreimage {
-		preimage = i.Terms.PaymentPreimage
-	} else {
-		preimage = zeroPreimage
-	}
-
-	if _, err := w.Write(preimage[:]); err != nil {
+	// if the preimage is defined locally, it will be persisted here.
+	// Otherwise, the 32 bytes of 0 will be persisted.
+	if _, err := w.Write(i.Terms.PaymentPreimage[:]); err != nil {
 		return err
 	}
 
@@ -507,10 +529,7 @@ func deserializeInvoice(r io.Reader) (*Invoice, error) {
 		return nil, err
 	}
 
-	if invoice.Terms.ExternalPreimage {
-		// If the Preimage is external, we do not want a local copy of the preimage
-		invoice.Terms.PaymentPreimage = zeroPreimage
-	} else {
+	if !invoice.Terms.ExternalPreimage {
 		// If the Preimage is internal, we do not want a local copy of the hash
 		invoice.Terms.PaymentHash = zeroHash
 	}
@@ -532,6 +551,41 @@ func settleInvoice(invoices *bolt.Bucket, invoiceNum []byte) error {
 
 	invoice.Terms.Settled = true
 	invoice.SettleDate = time.Now()
+
+	var buf bytes.Buffer
+	if err := serializeInvoice(&buf, invoice); err != nil {
+		return nil
+	}
+
+	return invoices.Put(invoiceNum[:], buf.Bytes())
+}
+
+// addInvoicePreimage adds a preimage to an existing invoice that has an
+// External Preimage. It will only update invoices with External Preimage
+// marked to avoid overwriting otherwise good invoice preimages.
+func addInvoicePreimage(invoices *bolt.Bucket, invoiceNum []byte,
+	paymentPreimage [32]byte) error {
+	invoice, err := fetchInvoice(invoiceNum, invoices)
+	if err != nil {
+		return err
+	}
+
+	// Only allow setting a preimage on invoices that are true External Preimage
+	// invoices
+	if !invoice.Terms.ExternalPreimage {
+		return fmt.Errorf("Invoices without an ExternalPreimage flag cannot have "+
+			"their preimage modified.")
+	}
+
+	var zeroPreimage [32]byte
+
+	// If we already have a preimage we do not want to overwrite it.
+	if !bytes.Equal(zeroPreimage[:], invoice.Terms.PaymentPreimage[:]) {
+		return fmt.Errorf("Attempting to overwrite preimage on ExternalPreimage "+
+			"invoice with: %v", paymentPreimage)
+	}
+
+	invoice.Terms.PaymentPreimage = paymentPreimage
 
 	var buf bytes.Buffer
 	if err := serializeInvoice(&buf, invoice); err != nil {
