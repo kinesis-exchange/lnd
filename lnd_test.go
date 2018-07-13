@@ -3985,56 +3985,6 @@ func testInvoiceRoutingHints(net *lntest.NetworkHarness, t *harnessTest) {
 	closeChannelAndAssert(ctxt, t, net, net.Alice, chanPointEve, true)
 }
 
-// testExternalPreimageInvoice tests that invoices with external preimages
-// are created and retrieved correctly
-func testExternalPreimageInvoice(net *lntest.NetworkHarness, t *harnessTest) {
-	// ctxb := context.Background()
-
-	// const paymentAmt = 1000
-	hash := sha256.Sum256(bytes.Repeat([]byte("A"), 32))
-	if len(hash) == 0 {
-		t.Fatalf("fake err")
-	}
-	// invoice := &lnrpc.Invoice{
-	// 	Memo:             "testing",
-	// 	ExternalPreimage: true,
-	// 	RHash:            hash[:],
-	// 	Value:            paymentAmt,
-	// }
-	// invoiceResp, err := net.Bob.AddInvoice(ctxb, invoice)
-	// if err != nil {
-	// 	t.Fatalf("unable to add invoice: %v", err)
-	// }
-	// if !bytes.Equal(invoiceResp.RHash, hash[:]) {
-	// 	t.Fatalf("expected returned hash %v to match passed hash %v",
-	// 		invoiceResp.RHash, hash[:])
-	// }
-
-	// // Bob's invoice should now be found
-	// payHash := &lnrpc.PaymentHash{
-	// 	RHash: invoiceResp.RHash,
-	// }
-	// dbInvoice, err := net.Bob.LookupInvoice(ctxb, payHash)
-	// if err != nil {
-	// 	t.Fatalf("unable to lookup invoice: %v", err)
-	// }
-	// if !dbInvoice.ExternalPreimage {
-	// 	t.Fatalf("bob's invoice should be use an external preimage: %v",
-	// 		spew.Sdump(dbInvoice))
-	// }
-
-	// var zeroPreimage [32]byte
-	// if !bytes.Equal(zeroPreimage[:], dbInvoice.RPreimage) {
-	// 	t.Fatalf("bob's invoice should not have a preimage defined, found: %v",
-	// 		dbInvoice.RPreimage)
-	// }
-
-	// if !bytes.Equal(hash[:], dbInvoice.RHash) {
-	// 	t.Fatalf("expected saved hash %v to match passed hash %v",
-	// 		dbInvoice.RHash, hash[:])
-	// }
-}
-
 // testMultiHopOverPrivateChannels tests that private channels can be used as
 // intermediate hops in a route for payments.
 func testMultiHopOverPrivateChannels(net *lntest.NetworkHarness, t *harnessTest) {
@@ -10034,10 +9984,6 @@ var testsCases = []*testCase{
 	{
 		name: "single hop invoice",
 		test: testSingleHopInvoice,
-	},
-	{
-		name: "external preimage invoice",
-		test: testExternalPreimageInvoice,
 	},
 	{
 		name: "sphinx replay persistence",
