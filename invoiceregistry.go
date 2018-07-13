@@ -161,6 +161,19 @@ func (i *invoiceRegistry) SettleInvoice(rHash chainhash.Hash) error {
 	return nil
 }
 
+// AddInvoicePreimage attempts to add a preimage to an invoice with
+// an external preimage.
+func (i *invoiceRegistry) AddInvoicePreimage(rHash chainhash.Hash,
+	rPreimage [32]byte) error {
+	ltndLog.Debugf("Adding preimage to invoice %x", rHash[:])
+
+	if err := i.cdb.AddInvoicePreimage(rHash, rPreimage); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // notifyClients notifies all currently registered invoice notification clients
 // of a newly added/settled invoice.
 func (i *invoiceRegistry) notifyClients(invoice *channeldb.Invoice, settle bool) {

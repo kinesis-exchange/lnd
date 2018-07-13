@@ -1,6 +1,7 @@
 package channeldb
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"reflect"
@@ -161,12 +162,37 @@ func TestInvoiceWorkflow(t *testing.T) {
 			"instead %v", err)
 	}
 
+	// Attempt to add a preimage to the existing invoice, this should succeed
+	var fakePreimage [32]byte
+	copy(fakePreimage[:], []byte("fake preimage"))
+	if err := db.AddInvoicePreimage(externalPreimagePaymentHash, fakePreimage); err != nil {
+		t.Fatalf("unable to add preimage: %v", err)
+	}
+	dbLocalPreimageInvoice, err := db.LookupInvoice(externalPreimagePaymentHash)
+	if err != nil {
+		t.Fatalf("unable to find invoice: %v", err)
+	}
+	if !bytes.Equal(fakePreimage[:], dbLocalPreimageInvoice.Terms.PaymentPreimage[:]) {
+		t.Fatalf("invoice fetched from db doesn't have local preimage: %v vs %v",
+			fakePreimage, dbLocalPreimageInvoice.Terms.PaymentPreimage)
+	}
+
+	// Attempt to add a preimage to the same invoice again, this should fail
+	var anotherFakePreimage [32]byte
+	copy(anotherFakePreimage[:], []byte("another fake"))
+	if err := db.AddInvoicePreimage(externalPreimagePaymentHash, anotherFakePreimage); err == nil {
+		t.Fatalf("invoice overwrote preimage for hash")
+	}
+
+	// Attempt to add a preimage to a non-ExternalPreimage invoice, this should fail
+	if err := db.AddInvoicePreimage(paymentHash, anotherFakePreimage); err == nil {
+		t.Fatalf("invoice wrote preimage for non-ExternalPreimage invoice")
+	}
+
 	// Add 100 random invoices.
 	const numInvoices = 10
 	amt := lnwire.NewMSatFromSatoshis(1000)
 	invoices := make([]*Invoice, numInvoices+1)
-	invoices[0] = dbInvoice2
-	invoices[1] = dbExternalPreimageInvoice
 	for i := 2; i < len(invoices)-1; i++ {
 		invoice, err := randInvoice(amt)
 		if err != nil {
@@ -190,7 +216,7 @@ func TestInvoiceWorkflow(t *testing.T) {
 	// using big endian, the invoices should be retrieved in ascending
 	// order (and the primary key should be incremented with each
 	// insertion).
-	for i := 0; i < len(invoices)-1; i++ {
+	for i := 2; i < len(invoices)-1; i++ {
 		if !reflect.DeepEqual(invoices[i], dbInvoices[i]) {
 			t.Fatalf("retrieved invoices don't match %v vs %v",
 				spew.Sdump(invoices[i]),

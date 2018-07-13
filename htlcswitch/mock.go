@@ -704,6 +704,32 @@ func (i *mockInvoiceRegistry) AddInvoice(invoice channeldb.Invoice) error {
 	return nil
 }
 
+func (i *mockInvoiceRegistry) AddInvoicePreimage(rhash chainhash.Hash, rpreimage [32]byte) error {
+	i.Lock()
+	defer i.Unlock()
+
+	invoice, ok := i.invoices[rhash]
+	if !ok {
+		return fmt.Errorf("can't find mock invoice: %x", rhash[:])
+	}
+
+	if !invoice.Terms.ExternalPreimage {
+		return fmt.Errorf("attempting to add preimage to "+
+			"non-ExternalPreimage invoice: %x", rhash[:])
+	}
+
+	var zeroPreimage [32]byte
+	if !bytes.Equal(invoice.Terms.PaymentPreimage[:], zeroPreimage[:]) {
+		return fmt.Errorf("attempting to overwrite preimage: %x",
+			invoice.Terms.PaymentPreimage[:])
+	}
+
+	invoice.Terms.PaymentPreimage = rpreimage
+	i.invoices[rhash] = invoice
+
+	return nil
+}
+
 var _ InvoiceDatabase = (*mockInvoiceRegistry)(nil)
 
 type mockSigner struct {
