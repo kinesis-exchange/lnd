@@ -581,7 +581,7 @@ func addInvoicePreimage(invoices *bolt.Bucket, invoiceNum []byte,
 
 	// If we already have a preimage we do not want to overwrite it.
 	if !bytes.Equal(zeroPreimage[:], invoice.Terms.PaymentPreimage[:]) {
-		return fmt.Errorf("Attempting to overwrite preimage on ExternalPreimage "+
+		return fmt.Errorf("Attempted to overwrite preimage on ExternalPreimage "+
 			"invoice with: %v", paymentPreimage)
 	}
 

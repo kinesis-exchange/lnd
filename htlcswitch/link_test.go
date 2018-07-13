@@ -579,6 +579,10 @@ func TestChannelLinkExternalPreimagePayment(t *testing.T) {
 	if !invoice.Terms.Settled {
 		t.Fatal("alice invoice wasn't settled")
 	}
+	if !bytes.Equal(invoice.Terms.PaymentPreimage[:], preimage[:]) {
+		t.Fatalf("preimage wasn't saved: expected %v, got %v",
+			preimage[:], invoice.Terms.PaymentPreimage[:])
+	}
 
 	if aliceBandwidthBefore-amount != n.aliceChannelLink.Bandwidth() {
 		t.Fatal("alice bandwidth should have decrease on payment " +
