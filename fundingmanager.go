@@ -84,7 +84,8 @@ var (
 	// to the value under the Bitcoin chain as default.
 	//
 	// TODO(roasbeef): add command line param to modify
-	// maxFundingAmount = maxBtcFundingAmount
+	maxFundingAmount = maxBtcFundingAmount
+	fmt.Sprintf("MAX FUNDING AMOUNT IS fundingmanager.go:%d", maxFundingAmount)
 )
 
 // reservationWithCtx encapsulates a pending channel reservation. This wrapper

@@ -597,6 +597,7 @@ func loadConfig() (*config, error) {
 		// primary chain.
 		registeredChains.RegisterPrimaryChain(litecoinChain)
 		maxFundingAmount = maxLtcFundingAmount
+		fmt.Sprintf("MAX FUNDING AMOUNT IS:%d", maxFundingAmount)
 		maxPaymentMSat = maxLtcPaymentMSat
 
 	case cfg.Bitcoin.Active:
