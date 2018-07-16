@@ -293,6 +293,7 @@ func lndMain() error {
 		chainCfg = cfg.Litecoin
 		minRemoteDelay = minLtcRemoteDelay
 		maxRemoteDelay = maxLtcRemoteDelay
+		maxFundingAmount = maxLtcFundingAmount
 	}
 
 	// TODO(roasbeef): add rotation
