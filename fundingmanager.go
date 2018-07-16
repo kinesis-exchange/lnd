@@ -969,8 +969,7 @@ func (f *fundingManager) handleFundingOpen(fmsg *fundingOpenMsg) {
 		return
 	}
 
-	fndgLog.Errorf("MAX FUNDING AMOUNT IS fundingmanager.go:%d", maxFundingAmount)
-
+	fndgLog.Printf("MAX FUNDING AMOUNT IS fundingmanager.go:%d", maxFundingAmount)
 
 	// We'll reject any request to create a channel that's above the
 	// current soft-limit for channel size.
