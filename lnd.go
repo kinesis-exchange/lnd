@@ -289,6 +289,8 @@ func lndMain() error {
 	chainCfg := cfg.Bitcoin
 	minRemoteDelay := minBtcRemoteDelay
 	maxRemoteDelay := maxBtcRemoteDelay
+	maxFundingAmount := maxBtcFundingAmount
+
 	if primaryChain == litecoinChain {
 		chainCfg = cfg.Litecoin
 		minRemoteDelay = minLtcRemoteDelay

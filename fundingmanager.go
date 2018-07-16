@@ -84,7 +84,7 @@ var (
 	// to the value under the Bitcoin chain as default.
 	//
 	// TODO(roasbeef): add command line param to modify
-	maxFundingAmount = maxBtcFundingAmount
+	// maxFundingAmount = maxBtcFundingAmount
 )
 
 // reservationWithCtx encapsulates a pending channel reservation. This wrapper
