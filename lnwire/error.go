@@ -42,7 +42,7 @@ func (e ErrorCode) String() string {
 	case ErrSynchronizingChain:
 		return "Synchronizing blockchain"
 	case ErrChanTooLarge:
-		return "channel too large"
+		return "channel too large TESTING"
 	default:
 		return "unknown error"
 	}
