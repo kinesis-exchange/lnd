@@ -2575,6 +2575,46 @@ func testSingleHopInvoice(net *lntest.NetworkHarness, t *harnessTest) {
 	closeChannelAndAssert(ctxt, t, net, net.Alice, chanPoint, false)
 }
 
+func testExternalPreimageInvoice(net *lntest.NetworkHarness, t *harnessTest) {
+	ctxb := context.Background()
+
+	// create an invoice for Bob which expects a payment of 1000 satoshis
+	// from Alice paid via an external preimage
+	const paymentAmt = 1000
+	preimage := bytes.Repeat([]byte("B"), 32)
+	hash := sha256.Sum256(preimage)
+	invoice := &lnrpc.Invoice{
+		Memo:             "testing",
+		ExternalPreimage: true,
+		RHash:            hash[:],
+		Value:            paymentAmt,
+	}
+	_, err := net.Bob.AddInvoice(ctxb, invoice)
+	if err != nil {
+		t.Fatalf("unable to add invoice: %v", err)
+	}
+
+	dbInvoice, err := net.Bob.LookupInvoice(ctxb, &lnrpc.PaymentHash{
+		RHash: hash[:],
+	})
+	if err != nil {
+		t.Fatalf("unable to find invoice: %v", err)
+	}
+
+	if dbInvoice.ExternalPreimage != true {
+		t.Fatalf("ExternalPreimage is not set on stored invoice")
+	}
+
+	if !bytes.Equal(dbInvoice.RHash, hash[:]) {
+		t.Fatalf("RHash of stored invoice did not match, expected %v, got %v", hash[:], dbInvoice.RHash)
+	}
+
+	var zeroPreimage [32]byte
+	if !bytes.Equal(dbInvoice.RPreimage, zeroPreimage[:]) {
+		t.Fatalf("RPreimage was set on invoice. Expected %v, got %v", zeroPreimage[:], dbInvoice.RPreimage)
+	}
+}
+
 func testListPayments(net *lntest.NetworkHarness, t *harnessTest) {
 	ctxb := context.Background()
 	timeout := time.Duration(time.Second * 5)
@@ -9984,6 +10024,10 @@ var testsCases = []*testCase{
 	{
 		name: "single hop invoice",
 		test: testSingleHopInvoice,
+	},
+	{
+		name: "external preimage invoice",
+		test: testExternalPreimageInvoice,
 	},
 	{
 		name: "sphinx replay persistence",
