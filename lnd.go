@@ -118,7 +118,7 @@ func lndMain() error {
 	case cfg.Bitcoin.MainNet || cfg.Litecoin.MainNet:
 		network = "mainnet"
 
-	case cfg.Bitcoin.SimNet:
+	case cfg.Bitcoin.SimNet || cfg.Litecoin.SimNet:
 		network = "simnet"
 
 	case cfg.Bitcoin.RegTest:
@@ -561,53 +561,52 @@ func lndMain() error {
 		}()
 	}
 
-	// If we're not in simnet mode, We'll wait until we're fully synced to
-	// continue the start up of the remainder of the daemon. This ensures
-	// that we don't accept any possibly invalid state transitions, or
-	// accept channels with spent funds.
-	if !(cfg.Bitcoin.SimNet || cfg.Litecoin.SimNet) {
-		_, bestHeight, err := activeChainControl.chainIO.GetBestBlock()
-		if err != nil {
-			return err
-		}
-
-		ltndLog.Infof("Waiting for chain backend to finish sync, "+
-			"start_height=%v", bestHeight)
-
-		// We'll add an interrupt handler in order to process shutdown
-		// requests while the chain backend syncs.
-		addInterruptHandler(func() {
-			rpcServer.Stop()
-			fundingMgr.Stop()
-		})
-
-		for {
-			select {
-			case <-shutdownChannel:
-				return nil
-			default:
-			}
-
-			synced, _, err := activeChainControl.wallet.IsSynced()
-			if err != nil {
-				return err
-			}
-
-			if synced {
-				break
-			}
-
-			time.Sleep(time.Second * 1)
-		}
-
-		_, bestHeight, err = activeChainControl.chainIO.GetBestBlock()
-		if err != nil {
-			return err
-		}
-
-		ltndLog.Infof("Chain backend is fully synced (end_height=%v)!",
-			bestHeight)
+	// Originally in LND, if we were in simnet mode, we would allow the code
+	// to continue the start up of the remainder of the daemon. HOWEVER, this
+	// did not provide a real-world dev env when using simnet. We've removed
+	// this check so we don't accept any invalid state transitions, or
+	// accept channels with spent funds on all networks
+	_, bestHeight, err := activeChainControl.chainIO.GetBestBlock()
+	if err != nil {
+		return err
 	}
+
+	ltndLog.Infof("Waiting for chain backend to finish sync, "+
+		"start_height=%v", bestHeight)
+
+	// We'll add an interrupt handler in order to process shutdown
+	// requests while the chain backend syncs.
+	addInterruptHandler(func() {
+		rpcServer.Stop()
+		fundingMgr.Stop()
+	})
+
+	for {
+		select {
+		case <-shutdownChannel:
+			return nil
+		default:
+		}
+
+		synced, _, err := activeChainControl.wallet.IsSynced()
+		if err != nil {
+			return err
+		}
+
+		if synced {
+			break
+		}
+
+		time.Sleep(time.Second * 1)
+	}
+
+	_, bestHeight, err = activeChainControl.chainIO.GetBestBlock()
+	if err != nil {
+		return err
+	}
+
+	ltndLog.Infof("Chain backend is fully synced (end_height=%v)!",
+		bestHeight)
 
 	// With all the relevant chains initialized, we can finally start the
 	// server itself.

@@ -2680,10 +2680,17 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		Receipt:        invoice.Receipt,
 		PaymentRequest: []byte(payReqString),
 		Terms: channeldb.ContractTerm{
+			ExternalPreimage: invoice.ExternalPreimage,
 			Value: amtMSat,
 		},
 	}
 	copy(i.Terms.PaymentPreimage[:], paymentPreimage[:])
+
+	// If we are using an external preimage, we need to persist the payment
+	// hash locally so that we can identify incoming payments to this invoice
+	if invoice.ExternalPreimage {
+		copy(i.Terms.PaymentHash[:], rHash[:])
+	}
 
 	rpcsLog.Tracef("[addinvoice] adding new invoice %v",
 		newLogClosure(func() string {
