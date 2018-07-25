@@ -3229,6 +3229,9 @@ func (r *rpcServer) QueryRoutes(ctx context.Context,
 	// requested routes, we'll clamp down the length of the response to the
 	// minimum of the two.
 	numRoutes := int32(len(routes))
+
+	fmt.Sprintf("What the heck happened?: %v - %v", numRoutes, in.NumRoutes)
+
 	if in.NumRoutes < numRoutes {
 		numRoutes = in.NumRoutes
 	}
@@ -3239,8 +3242,11 @@ func (r *rpcServer) QueryRoutes(ctx context.Context,
 		Routes: make([]*lnrpc.Route, 0, in.NumRoutes),
 	}
 	for i := int32(0); i < numRoutes; i++ {
+		marshalledRoute := marshallRoute(routes[i])
+		fmt.Sprintf("What does this thing look like: %v", marshalledRoute)
+
 		routeResp.Routes = append(
-			routeResp.Routes, marshallRoute(routes[i]),
+			routeResp.Routes, marshalledRoute
 		)
 	}
 
