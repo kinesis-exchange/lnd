@@ -3230,7 +3230,7 @@ func (r *rpcServer) QueryRoutes(ctx context.Context,
 	// minimum of the two.
 	numRoutes := int32(len(routes))
 
-	fmt.Sprintf("What the heck happened?: %v - %v", numRoutes, in.NumRoutes)
+	fmt.Printf("What the heck happened?: %v - %v", numRoutes, in.NumRoutes)
 
 	if in.NumRoutes < numRoutes {
 		numRoutes = in.NumRoutes
@@ -3243,11 +3243,8 @@ func (r *rpcServer) QueryRoutes(ctx context.Context,
 	}
 	for i := int32(0); i < numRoutes; i++ {
 		marshalledRoute := marshallRoute(routes[i])
-		fmt.Sprintf("What does this thing look like: %v", marshalledRoute)
-
-		routeResp.Routes = append(
-			routeResp.Routes, marshalledRoute
-		)
+		fmt.Printf("What does this thing look like: %v", marshalledRoute)
+		routeResp.Routes = append(routeResp.Routes, marshalledRoute)
 	}
 
 	return routeResp, nil
