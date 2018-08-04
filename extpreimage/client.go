@@ -145,7 +145,9 @@ func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error, error) {
 
 	symbol, err := c.symbol()
 	if err != nil {
-		return preimage, nil, err
+		// Not having the correct configuration on the chain is a temporary error
+		// since we can recover from it
+		return preimage, err, nil
 	}
 
 	rpcReq := &GetPreimageRequest{
@@ -158,15 +160,21 @@ func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error, error) {
 
 	res, err := c.retrieve(rpcReq)
 	if err != nil {
+		// An error with retrieving the preimage itself is considered temporary
+		// since we don't know if we will eventually be able to retrieve it
 		return preimage, err, nil
 	}
 
 	if res.PermanentError != "" {
+		// If the external service marks an error as permanent we can pass it on
+		// as permanent
 		return preimage, nil, fmt.Errorf("extpreimage: Encountered permanent "+
 			"error from external service: %v", res.PermanentError)
 	}
 
 	if len(res.PaymentPreimage) != 32 {
+		// We return this as a non-permanent error since the external service did
+		// not indicate it as such
 		return preimage, fmt.Errorf("extpreimage: Returned preimage was of length %v, "+
 			"expected %v", len(res.PaymentPreimage), 32), nil
 	}
@@ -175,6 +183,8 @@ func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error, error) {
 	// this preimage actually matches this hash before returning it to the caller
 	derivedHash := sha256.Sum256(res.PaymentPreimage[:])
 	if !bytes.Equal(derivedHash[:], req.PaymentHash[:]) {
+		// We return this as a non-permanent error since the external service did
+		// not indicate it as such
 		return preimage, fmt.Errorf("extpreimage: Returned preimage did not " +
 			"match provided hash"), nil
 	}
