@@ -44,7 +44,7 @@ func DefaultRPC() RPC {
 // Client is the exposed interface for an extpreimage Client
 type Client interface {
 	connect(context.Context) (ExternalPreimageServiceClient, error)
-	Retrieve(*PreimageRequest) ([32]byte, error)
+	Retrieve(*PreimageRequest) ([32]byte, error, error)
 	Stop()
 }
 
@@ -136,12 +136,16 @@ type PreimageRequest struct {
 	BestHeight  uint32
 }
 
-func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error) {
+// Retrieve retrieves a preimage for a given hash. It returns two errors,
+// the first of which is temporary, the other is permanent. Permanent errors
+// are safe to result in upstream HTLC cancellations. Temporary errors are
+// not.
+func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error, error) {
 	var preimage [32]byte
 
 	symbol, err := c.symbol()
 	if err != nil {
-		return preimage, err
+		return preimage, nil, err
 	}
 
 	rpcReq := &GetPreimageRequest{
@@ -154,12 +158,17 @@ func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error) {
 
 	res, err := c.retrieve(rpcReq)
 	if err != nil {
-		return preimage, err
+		return preimage, err, nil
+	}
+
+	if res.PermanentError != "" {
+		return preimage, nil, fmt.Errorf("extpreimage: Encountered permanent "+
+			"error from external service: %v", res.PermanentError)
 	}
 
 	if len(res.PaymentPreimage) != 32 {
 		return preimage, fmt.Errorf("extpreimage: Returned preimage was of length %v, "+
-			"expected %v", len(res.PaymentPreimage), 32)
+			"expected %v", len(res.PaymentPreimage), 32), nil
 	}
 
 	// Since the hash and preimage were stored separately, we need to validate that
@@ -167,11 +176,11 @@ func (c *client) Retrieve(req *PreimageRequest) ([32]byte, error) {
 	derivedHash := sha256.Sum256(res.PaymentPreimage[:])
 	if !bytes.Equal(derivedHash[:], req.PaymentHash[:]) {
 		return preimage, fmt.Errorf("extpreimage: Returned preimage did not " +
-			"match provided hash")
+			"match provided hash"), nil
 	}
 
 	copy(preimage[:], res.PaymentPreimage)
-	return preimage, nil
+	return preimage, nil, nil
 }
 
 // Stop closes any outstanding grpc connections to allow for a graceful

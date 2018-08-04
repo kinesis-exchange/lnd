@@ -118,10 +118,14 @@ func TestRetrieveConnects(t *testing.T) {
 	req := &extpreimage.PreimageRequest{
 		PaymentHash: hash,
 	}
-	_, err := c.Retrieve(req)
+	_, tempErr, permErr := c.Retrieve(req)
 
-	if err != nil {
-		t.Fatalf("Got error while retrieving: %v", err)
+	if tempErr != nil {
+		t.Fatalf("Got temporary error while retrieving: %v", tempErr)
+	}
+
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
 	}
 
 	if rpc.connOpen != true {
@@ -169,10 +173,14 @@ func TestRetrieveFormsValidRequest(t *testing.T) {
 		TimeLock:    timeLock,
 		BestHeight:  bestHeight,
 	}
-	_, err := c.Retrieve(req)
+	_, tempErr, permErr := c.Retrieve(req)
 
-	if err != nil {
-		t.Fatalf("Got error while retrieving: %v", err)
+	if tempErr != nil {
+		t.Fatalf("Got temporary error while retrieving: %v", tempErr)
+	}
+
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
 	}
 }
 
@@ -213,10 +221,14 @@ func TestRetrieveSuppliesSymbol(t *testing.T) {
 		TimeLock:    timeLock,
 		BestHeight:  bestHeight,
 	}
-	_, err := c.Retrieve(req)
+	_, tempErr, permErr := c.Retrieve(req)
 
-	if err != nil {
-		t.Fatalf("Got error while retrieving: %v", err)
+	if tempErr != nil {
+		t.Fatalf("Got temporary error while retrieving: %v", tempErr)
+	}
+
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
 	}
 }
 
@@ -239,10 +251,14 @@ func TestRetrieveReturnsFirstMessage(t *testing.T) {
 	req := &extpreimage.PreimageRequest{
 		PaymentHash: hash,
 	}
-	res, err := c.Retrieve(req)
+	res, tempErr, permErr := c.Retrieve(req)
 
-	if err != nil {
-		t.Fatalf("Got error while retrieving: %v", err)
+	if tempErr != nil {
+		t.Fatalf("Got temporary error while retrieving: %v", tempErr)
+	}
+
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
 	}
 
 	if res != preimage {
@@ -271,17 +287,21 @@ func TestRetrievesRejectsInvalidPreimages(t *testing.T) {
 	req := &extpreimage.PreimageRequest{
 		PaymentHash: hash,
 	}
-	_, err := c.Retrieve(req)
+	_, tempErr, permErr := c.Retrieve(req)
 
-	if (err == nil) || (err.Error() != expectedErr) {
-		t.Fatalf("Expected err of %v, got %v", expectedErr, err)
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
+	}
+
+	if (tempErr == nil) || (tempErr.Error() != expectedErr) {
+		t.Fatalf("Expected tempErr of %v, got %v", expectedErr, tempErr)
 	}
 }
 
 // TestRetrieveErrorsOnStreamError tests that Retrieve will return
 // an error to the caller if the stream to the external preimage
 // server encounters an error.
-func TestRetrieveErrorsOnStreamError(t *testing.T) {
+func TestRetrieveTempErrorsOnStreamError(t *testing.T) {
 	host := "mockhost:12345"
 	chain := "bitcoin"
 	fakeErr := fmt.Errorf("fake error")
@@ -292,17 +312,21 @@ func TestRetrieveErrorsOnStreamError(t *testing.T) {
 	rpc.stream.EXPECT().Recv().Return(nil, fakeErr)
 
 	req := &extpreimage.PreimageRequest{}
-	_, err := c.Retrieve(req)
+	_, tempErr, permErr := c.Retrieve(req)
 
-	if err != fakeErr {
-		t.Fatalf("Expected err of %v, got %v", fakeErr, err)
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
+	}
+
+	if tempErr != fakeErr {
+		t.Fatalf("Expected tempErr of %v, got %v", fakeErr, tempErr)
 	}
 }
 
 // TestRetrieveErrorsOnEarlyClose tests that Retrieve will return an error
 // to the caller if the stream to the external preimage service closes
 // before returning the requested preimage.
-func TestRetrieveErrorsOnEarlyClose(t *testing.T) {
+func TestRetrieveTempErrorsOnEarlyClose(t *testing.T) {
 	host := "mockhost:12345"
 	chain := "bitcoin"
 	expectedErr := "extpreimage: server closed stream early"
@@ -313,9 +337,46 @@ func TestRetrieveErrorsOnEarlyClose(t *testing.T) {
 	rpc.stream.EXPECT().Recv().Return(nil, io.EOF)
 
 	req := &extpreimage.PreimageRequest{}
-	_, err := c.Retrieve(req)
+	_, tempErr, permErr := c.Retrieve(req)
 
-	if (err == nil) || (err.Error() != expectedErr) {
-		t.Fatalf("Expected err of %v, got %v", expectedErr, err.Error())
+	if permErr != nil {
+		t.Fatalf("Got permanent error while retrieving: %v", permErr)
+	}
+
+	if (tempErr == nil) || (tempErr.Error() != expectedErr) {
+		t.Fatalf("Expected tempErr of %v, got %v", expectedErr, tempErr.Error())
+	}
+}
+
+// TestRetrievePermanentErrorsOnRoutingFailure tests that Retrieve will return
+// a permanent error if it receives a permanent failure from the external
+// preimage service.
+func TestRetrievePermanentErrorsOnPermanentFailure(t *testing.T) {
+	host := "mockhost:12345"
+	chain := "bitcoin"
+	err := "fake error"
+	preimage := makePreimage("fake preimage")
+	hash := sha256.Sum256(preimage[:])
+	expectedErr := "extpreimage: Encountered permanent error from external "+
+		"service: " + err
+	msg := &extpreimage.GetPreimageResponse{
+		PermanentError: err,
+	}
+	c, rpc := newMock(t, host, chain)
+
+	// Set expectation on receiving.
+	rpc.stream.EXPECT().Recv().Return(msg, nil)
+
+	req := &extpreimage.PreimageRequest{
+		PaymentHash: hash,
+	}
+	_, tempErr, permErr := c.Retrieve(req)
+
+	if tempErr != nil {
+		t.Fatalf("Got temporary error while retrieving: %v", tempErr)
+	}
+
+	if (permErr == nil) || (permErr.Error() != expectedErr) {
+		t.Fatalf("Expected permErr of %v, got %v", expectedErr, permErr)
 	}
 }
