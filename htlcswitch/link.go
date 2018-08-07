@@ -2325,13 +2325,31 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 					BestHeight:  heightNow,
 				}
 
-				var err error
-				preimage, err = l.cfg.ExtpreimageClient.Retrieve(preimageRequest)
+				var tempErr error
+				var permErr error
+				preimage, tempErr, permErr =
+					l.cfg.ExtpreimageClient.Retrieve(preimageRequest)
 
-				if err != nil {
+				if tempErr != nil {
 					l.fail(LinkFailureError{code: ErrInternalError},
-						"unable to retrieve external invoice: %v", err)
+						"unable to retrieve external invoice: %v", tempErr)
 					return false
+				}
+
+				if permErr != nil {
+					log.Errorf("permanent error while retrieving external invoice: "+
+						"%v", permErr)
+
+					// we categorize all failures to retrieve external invoice preimages
+					// as unknown payment hashes since that's the most accurate for
+					// the protocol.
+					failure := lnwire.FailUnknownPaymentHash{}
+					l.sendHTLCError(
+						pd.HtlcIndex, failure, obfuscator, pd.SourceRef,
+					)
+
+					needUpdate = true
+					continue
 				}
 
 				// we should persist the preimage locally before settling the

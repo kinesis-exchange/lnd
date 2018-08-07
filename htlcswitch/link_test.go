@@ -491,19 +491,26 @@ func TestChannelLinkMultiHopPayment(t *testing.T) {
 type mockExtpreimageClient struct {
 	extpreimage.Client
 	preimage [32]byte
+	permError error
 }
 
 func (c *mockExtpreimageClient) Retrieve(*extpreimage.PreimageRequest) (
-	[32]byte, error) {
+	[32]byte, error, error) {
 	time.Sleep(100 * time.Millisecond)
-	return c.preimage, nil
+
+	if c.permError != nil {
+		var zeroPreimage [32]byte
+		return zeroPreimage, nil, c.permError
+	}
+
+	return c.preimage, nil, nil
 }
 
-// TestChannelLinkExternalPreimagePayment tests that when an exit node receives
+// TestExitNodeExternalPreimagePayment tests that when an exit node receives
 // an incoming HTLC for which the invoice has an external preimage (i.e. has
 // ExternalPreimage set to true) that it successfully calls the external
 // preimage service to retrieve the preimage.
-func TestChannelLinkExternalPreimagePayment(t *testing.T) {
+func TestExitNodeExternalPreimagePayment(t *testing.T) {
 	t.Parallel()
 
 	channels, cleanUp, _, err := createClusterChannels(
@@ -595,6 +602,83 @@ func TestChannelLinkExternalPreimagePayment(t *testing.T) {
 			n.firstBobChannelLink.Bandwidth())
 	}
 }
+
+// TestExitNodeExternalPreimatePermanentFail tests that when an exit node receives an
+// incoming HTLC, if retrieving the external preimage results in a permanent failure,
+// the HTLC will be rejected with the appropriate error.
+func TestExitNodeExternalPreimagePermanentFail(t *testing.T) {
+	t.Parallel()
+
+	channels, cleanUp, _, err := createClusterChannels(
+		btcutil.SatoshiPerBitcoin*3,
+		btcutil.SatoshiPerBitcoin*5)
+	if err != nil {
+		t.Fatalf("unable to create channel: %v", err)
+	}
+	defer cleanUp()
+
+	n := newThreeHopNetwork(t, channels.aliceToBob, channels.bobToAlice,
+		channels.bobToCarol, channels.carolToBob, testStartingHeight)
+	if err := n.start(); err != nil {
+		t.Fatal(err)
+	}
+	defer n.stop()
+
+	var preimage [32]byte
+	r, err := generateRandomBytes(32)
+	if err != nil {
+		t.Fatalf("unable to generate preimage: %v", err)
+	}
+	copy(preimage[:], r)
+
+	// set the external preimage client on bob's channel
+	n.firstBobChannelLink.cfg.ExtpreimageClient = &mockExtpreimageClient{
+		permError: fmt.Errorf("external permanent error"),
+	}
+
+	debug := false
+	if debug {
+		// Log message that alice receives.
+		n.aliceServer.intersect(createLogFunc("alice",
+			n.aliceChannelLink.ChanID()))
+
+		// Log message that bob receives.
+		n.bobServer.intersect(createLogFunc("bob",
+			n.firstBobChannelLink.ChanID()))
+	}
+
+	amount := lnwire.NewMSatFromSatoshis(btcutil.SatoshiPerBitcoin)
+	htlcAmt, totalTimelock, hops := generateHops(amount, testStartingHeight,
+		n.firstBobChannelLink)
+
+	// Wait for:
+	// * HTLC add request to be sent to bob.
+	// * alice<->bob commitment state to be updated.
+	// * settle request to be sent back from bob to alice.
+	// * alice<->bob commitment state to be updated.
+	// * user notification to be sent.
+	receiver := n.bobServer
+	_, err = n.makeExtpreimagePayment(n.aliceServer, receiver,
+		n.bobServer.PubKey(), hops, amount, htlcAmt,
+		totalTimelock, preimage).Wait(30 * time.Second)
+
+	if err == nil {
+		t.Fatalf("payment should have failed but didn't")
+	}
+
+	ferr, ok := err.(*ForwardingError)
+	if !ok {
+		t.Fatalf("expected a ForwardingError, instead got: %T", err)
+	}
+
+	switch ferr.FailureMessage.(type) {
+	case *lnwire.FailUnknownPaymentHash:
+	default:
+		t.Fatalf("incorrect error, expected incorrect cltv expiry, "+
+			"instead have: %v", err)
+	}
+}
+
 
 // TestExitNodeTimelockPayloadMismatch tests that when an exit node receives an
 // incoming HTLC, if the time lock encoded in the payload of the forwarded HTLC
