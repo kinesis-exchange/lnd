@@ -30,15 +30,6 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/btcwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/routing/chainview"
-<<<<<<< HEAD
-	"github.com/roasbeef/btcd/chaincfg/chainhash"
-	"github.com/roasbeef/btcd/rpcclient"
-	"github.com/roasbeef/btcutil"
-	"github.com/roasbeef/btcwallet/chain"
-	"github.com/roasbeef/btcwallet/wallet"
-	"github.com/roasbeef/btcwallet/walletdb"
-=======
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 )
 
 const (

@@ -18,15 +18,11 @@ type InvoiceDatabase interface {
 
 	// SettleInvoice attempts to mark an invoice corresponding to the
 	// passed payment hash as fully settled.
-<<<<<<< HEAD
-	SettleInvoice(chainhash.Hash) error
+	SettleInvoice(payHash chainhash.Hash, paidAmount lnwire.MilliSatoshi) error
 
 	// AddInvoicePreimage attempts to add a local preimage to an invoice
 	// that had an external preimage.
 	AddInvoicePreimage(chainhash.Hash, [32]byte) error
-=======
-	SettleInvoice(payHash chainhash.Hash, paidAmount lnwire.MilliSatoshi) error
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 }
 
 // ChannelLink is an interface which represents the subsystem for managing the

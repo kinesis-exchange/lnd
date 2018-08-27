@@ -150,7 +150,7 @@
     },
     "/v1/channels/closed": {
       "get": {
-        "summary": "* lncli: `closedchannels`\nClosedChannels returns a description of all the closed channels that \nthis node was a participant in.",
+        "summary": "* lncli: `closedchannels`\nClosedChannels returns a description of all the closed channels that\nthis node was a participant in.",
         "operationId": "ClosedChannels",
         "responses": {
           "200": {
@@ -553,7 +553,7 @@
     },
     "/v1/initwallet": {
       "post": {
-        "summary": "* \nInitWallet is used when lnd is starting up for the first time to fully\ninitialize the daemon and its internal wallet. At the very least a wallet\npassword must be provided. This will be used to encrypt sensitive material\non disk.",
+        "summary": "*\nInitWallet is used when lnd is starting up for the first time to fully\ninitialize the daemon and its internal wallet. At the very least a wallet\npassword must be provided. This will be used to encrypt sensitive material\non disk.",
         "description": "In the case of a recovery scenario, the user can also specify their aezeed\nmnemonic and passphrase. If set, then the daemon will use this prior state\nto initialize its internal wallet.\n\nAlternatively, this can be used along with the GenSeed RPC to obtain a\nseed, then present it to the user. Once it has been verified by the user,\nthe seed can be fed into this RPC in order to commit the new wallet.",
         "operationId": "InitWallet",
         "responses": {
@@ -1933,12 +1933,11 @@
           "format": "boolean",
           "description": "/ Whether this invoice should include routing hints for private channels."
         },
-<<<<<<< HEAD
         "external_preimage": {
           "type": "boolean",
           "format": "boolean",
           "title": "/ Whether the preimage for this invoice is defined locally or stored externally"
-=======
+        },
         "add_index": {
           "type": "string",
           "format": "uint64",
@@ -1953,7 +1952,6 @@
           "type": "string",
           "format": "int64",
           "description": "*\nThe amount that was accepted for this invoice. This will ONLY be set if\nthis invoice has been settled. We provide this field as if the invoice was\ncreated with a zero value, then we need to record what amount was\nultimately accepted. Additionally, it's possible that the sender paid MORE\nthat was specified in the original invoice. So we'll record that here as\nwell."
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
         }
       }
     },

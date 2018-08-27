@@ -558,25 +558,6 @@ func (p *peer) addLink(chanPoint *wire.OutPoint,
 	}
 
 	linkCfg := htlcswitch.ChannelLinkConfig{
-<<<<<<< HEAD
-		Peer:                  p,
-		DecodeHopIterators:    p.server.sphinx.DecodeHopIterators,
-		ExtractErrorEncrypter: p.server.sphinx.ExtractErrorEncrypter,
-		FetchLastChannelUpdate: fetchLastChanUpdate(
-			p.server, p.PubKey(),
-		),
-		DebugHTLC:         cfg.DebugHTLC,
-		HodlMask:          cfg.Hodl.Mask(),
-		Registry:          p.server.invoices,
-		Switch:            p.server.htlcSwitch,
-		Circuits:          p.server.htlcSwitch.CircuitModifier(),
-		ForwardPackets:    p.server.htlcSwitch.ForwardPackets,
-		FwrdingPolicy:     *forwardingPolicy,
-		FeeEstimator:      p.server.cc.feeEstimator,
-		PreimageCache:     p.server.witnessBeacon,
-		ExtpreimageClient: p.server.extpreimageClient,
-		ChainEvents:       chainEvents,
-=======
 		Peer:                   p,
 		DecodeHopIterators:     p.server.sphinx.DecodeHopIterators,
 		ExtractErrorEncrypter:  p.server.sphinx.ExtractErrorEncrypter,
@@ -590,8 +571,8 @@ func (p *peer) addLink(chanPoint *wire.OutPoint,
 		FwrdingPolicy:          *forwardingPolicy,
 		FeeEstimator:           p.server.cc.feeEstimator,
 		PreimageCache:          p.server.witnessBeacon,
+		ExtpreimageClient:      p.server.extpreimageClient,
 		ChainEvents:            chainEvents,
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 		UpdateContractSignals: func(signals *contractcourt.ContractSignals) error {
 			return p.server.chainArb.UpdateContractSignals(
 				*chanPoint, signals,

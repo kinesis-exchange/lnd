@@ -379,7 +379,6 @@ func lndMain() error {
 		}()
 	}
 
-<<<<<<< HEAD
 	// Originally in LND, if we were in simnet mode, we would allow the code
 	// to continue the start up of the remainder of the daemon. HOWEVER, this
 	// did not provide a real-world dev env when using simnet. We've removed
@@ -389,41 +388,13 @@ func lndMain() error {
 	if err != nil {
 		return err
 	}
-=======
-	// If we're not in simnet mode, We'll wait until we're fully synced to
-	// continue the start up of the remainder of the daemon. This ensures
-	// that we don't accept any possibly invalid state transitions, or
-	// accept channels with spent funds.
-	if !(cfg.Bitcoin.SimNet || cfg.Litecoin.SimNet) {
-		_, bestHeight, err := activeChainControl.chainIO.GetBestBlock()
-		if err != nil {
-			return err
-		}
-
-		ltndLog.Infof("Waiting for chain backend to finish sync, "+
-			"start_height=%v", bestHeight)
-
-		for {
-			if !signal.Alive() {
-				return nil
-			}
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 
 	ltndLog.Infof("Waiting for chain backend to finish sync, "+
 		"start_height=%v", bestHeight)
 
-	// We'll add an interrupt handler in order to process shutdown
-	// requests while the chain backend syncs.
-	addInterruptHandler(func() {
-		rpcServer.Stop()
-		fundingMgr.Stop()
-	})
-
 	for {
-		select {
-		case <-shutdownChannel:
+		if !signal.Alive() {
 			return nil
-		default:
 		}
 
 		synced, _, err := activeChainControl.wallet.IsSynced()

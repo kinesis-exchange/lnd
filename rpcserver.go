@@ -2728,7 +2728,7 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 		PaymentRequest: []byte(payReqString),
 		Terms: channeldb.ContractTerm{
 			ExternalPreimage: invoice.ExternalPreimage,
-			Value: amtMSat,
+			Value:            amtMSat,
 		},
 	}
 	copy(newInvoice.Terms.PaymentPreimage[:], paymentPreimage[:])
@@ -2736,7 +2736,7 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 	// If we are using an external preimage, we need to persist the payment
 	// hash locally so that we can identify incoming payments to this invoice
 	if invoice.ExternalPreimage {
-		copy(i.Terms.PaymentHash[:], rHash[:])
+		copy(newInvoice.Terms.PaymentHash[:], rHash[:])
 	}
 
 	rpcsLog.Tracef("[addinvoice] adding new invoice %v",
@@ -2768,6 +2768,7 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 	}
 
 	var paymentHash []byte
+
 	if invoice.Terms.ExternalPreimage {
 		paymentHash = invoice.Terms.PaymentHash[:]
 	} else {
@@ -2803,7 +2804,6 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 	satAmt := invoice.Terms.Value.ToSatoshis()
 
 	return &lnrpc.Invoice{
-<<<<<<< HEAD
 		Memo:             string(invoice.Memo[:]),
 		Receipt:          invoice.Receipt[:],
 		ExternalPreimage: invoice.Terms.ExternalPreimage,
@@ -2819,25 +2819,9 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 		CltvExpiry:       cltvExpiry,
 		FallbackAddr:     fallbackAddr,
 		RouteHints:       routeHints,
-=======
-		Memo:            string(invoice.Memo[:]),
-		Receipt:         invoice.Receipt[:],
-		RHash:           decoded.PaymentHash[:],
-		RPreimage:       preimage[:],
-		Value:           int64(satAmt),
-		CreationDate:    invoice.CreationDate.Unix(),
-		SettleDate:      settleDate,
-		Settled:         invoice.Terms.Settled,
-		PaymentRequest:  paymentRequest,
-		DescriptionHash: descHash,
-		Expiry:          expiry,
-		CltvExpiry:      cltvExpiry,
-		FallbackAddr:    fallbackAddr,
-		RouteHints:      routeHints,
-		AddIndex:        invoice.AddIndex,
-		SettleIndex:     invoice.SettleIndex,
-		AmtPaid:         int64(invoice.AmtPaid),
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
+		AddIndex:         invoice.AddIndex,
+		SettleIndex:      invoice.SettleIndex,
+		AmtPaid:          int64(invoice.AmtPaid),
 	}, nil
 }
 

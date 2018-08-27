@@ -896,16 +896,6 @@ func loadConfig() (*config, error) {
 			return nil, err
 		}
 
-<<<<<<< HEAD
-	// For the p2p port it makes no sense to listen to an Unix socket.
-	// Also, we would need to refactor the brontide listener to support
-	// that.
-	for _, p2pListener := range cfg.Listeners {
-		if lncfg.IsUnix(p2pListener) {
-			err := fmt.Errorf("unix socket addresses cannot be "+
-				"used for the p2p connection listener: %s",
-				p2pListener)
-=======
 		// Add default port to all external IP addresses if needed and remove
 		// duplicate addresses.
 		cfg.ExternalIPs, err = lncfg.NormalizeAddresses(
@@ -913,7 +903,6 @@ func loadConfig() (*config, error) {
 			cfg.net.ResolveTCPAddr,
 		)
 		if err != nil {
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 			return nil, err
 		}
 

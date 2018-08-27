@@ -71,13 +71,8 @@ func TestInvoiceWorkflow(t *testing.T) {
 	// Add the invoice to the database, this should succeed as there aren't
 	// any existing invoices within the database with the same payment
 	// hash.
-<<<<<<< HEAD
-	if err := db.AddInvoice(fakeInvoice); err != nil {
-		t.Fatalf("unable to add invoice: %v", err)
-=======
 	if _, err := db.AddInvoice(fakeInvoice); err != nil {
 		t.Fatalf("unable to find invoice: %v", err)
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 	}
 
 	// Attempt to retrieve the invoice which was just added to the
@@ -144,7 +139,6 @@ func TestInvoiceWorkflow(t *testing.T) {
 		t.Fatalf("lookup should have failed, instead %v", err)
 	}
 
-<<<<<<< HEAD
 	// Add an invoice with an external preimage
 	// Create a fake invoice with an external preimage which we'll use several times in the tests
 	// below.
@@ -214,19 +208,12 @@ func TestInvoiceWorkflow(t *testing.T) {
 		t.Fatalf("invoice wrote preimage for non-ExternalPreimage invoice")
 	}
 
-	// Add 100 random invoices.
-	const numInvoices = 10
-	amt := lnwire.NewMSatFromSatoshis(1000)
-	invoices := make([]*Invoice, numInvoices+1)
-	for i := 2; i < len(invoices)-1; i++ {
-=======
 	// Add 10 random invoices.
 	const numInvoices = 10
 	amt := lnwire.NewMSatFromSatoshis(1000)
 	invoices := make([]*Invoice, numInvoices+1)
 	invoices[0] = &dbInvoice2
 	for i := 1; i < len(invoices)-1; i++ {
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 		invoice, err := randInvoice(amt)
 		if err != nil {
 			t.Fatalf("unable to create invoice: %v", err)
@@ -249,13 +236,8 @@ func TestInvoiceWorkflow(t *testing.T) {
 	// using big endian, the invoices should be retrieved in ascending
 	// order (and the primary key should be incremented with each
 	// insertion).
-<<<<<<< HEAD
-	for i := 2; i < len(invoices)-1; i++ {
-		if !reflect.DeepEqual(invoices[i], dbInvoices[i]) {
-=======
 	for i := 0; i < len(invoices)-1; i++ {
 		if !reflect.DeepEqual(*invoices[i], dbInvoices[i]) {
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 			t.Fatalf("retrieved invoices don't match %v vs %v",
 				spew.Sdump(invoices[i]),
 				spew.Sdump(dbInvoices[i]))

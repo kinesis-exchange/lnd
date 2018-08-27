@@ -37,15 +37,14 @@ var (
 	// invoices are uniquely identified by the invoice ID.
 	numInvoicesKey = []byte("nik")
 
-<<<<<<< HEAD
 	// zeroPreimage is an empty preimage that we use when we have an external
 	// preimage for the invoice. We initialize it here to allow for easy
 	// comparisons.
 	zeroPreimage [32]byte
 
 	// zeroHash is an empty hash for easy comparisons.
+
 	zeroHash [sha256.Size]byte
-=======
 	// addIndexBucket is an index bucket that we'll use to create a
 	// monotonically increasing set of add indexes. Each time we add a new
 	// invoice, this sequence number will be incremented and then populated
@@ -65,7 +64,6 @@ var (
 	//
 	//   settleIndexNo => invoiceKey
 	settleIndexBucket = []byte("invoice-settle-index")
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 )
 
 const (
@@ -248,19 +246,15 @@ func (d *DB) AddInvoice(newInvoice *Invoice) (uint64, error) {
 			return err
 		}
 
-		paymentHash, err := getPaymentHash(i)
+		// Retrieves the payment hash for a given invoice, either by calculating it
+		// from the preimage, or using the given hash for invoices with external preimages.
+		paymentHash, err := getPaymentHash(newInvoice)
 		if err != nil {
 			return err
 		}
 
 		// Ensure that an invoice an identical payment hash doesn't
 		// already exist within the index.
-<<<<<<< HEAD
-=======
-		paymentHash := sha256.Sum256(
-			newInvoice.Terms.PaymentPreimage[:],
-		)
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 		if invoiceIndex.Get(paymentHash[:]) != nil {
 			return ErrDuplicateInvoice
 		}
@@ -624,7 +618,6 @@ func (d *DB) SettleInvoice(paymentHash [32]byte,
 	return settledInvoice, nil
 }
 
-<<<<<<< HEAD
 // addInvoicePreimage attempts to update an invoice with an External Preimage
 // to save that preimage locally, allowing us to re-use it for duplicate
 // payments and provide it to listeners via LookupInvoice. If an invoice
@@ -652,9 +645,6 @@ func (d *DB) AddInvoicePreimage(paymentHash [32]byte,
 	})
 }
 
-func putInvoice(invoices *bolt.Bucket, invoiceIndex *bolt.Bucket,
-	i *Invoice, invoiceNum uint32) error {
-=======
 // InvoicesSettledSince can be used by callers to catch up any settled invoices
 // they missed within the settled invoice time series. We'll return all known
 // settled invoice that have a settle index higher than the passed
@@ -718,7 +708,6 @@ func (d *DB) InvoicesSettledSince(sinceSettleIndex uint64) ([]Invoice, error) {
 
 func putInvoice(invoices, invoiceIndex, addIndex *bolt.Bucket,
 	i *Invoice, invoiceNum uint32) (uint64, error) {
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 
 	// Create the invoice key which is just the big-endian representation
 	// of the invoice number.
@@ -736,18 +725,13 @@ func putInvoice(invoices, invoiceIndex, addIndex *bolt.Bucket,
 
 	paymentHash, err := getPaymentHash(i)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// Add the payment hash to the invoice index. This will let us quickly
 	// identify if we can settle an incoming payment, and also to possibly
 	// allow a single invoice to have multiple payment installations.
-<<<<<<< HEAD
-	if err := invoiceIndex.Put(paymentHash[:], invoiceKey[:]); err != nil {
-		return err
-=======
-	paymentHash := sha256.Sum256(i.Terms.PaymentPreimage[:])
-	err := invoiceIndex.Put(paymentHash[:], invoiceKey[:])
+	err = invoiceIndex.Put(paymentHash[:], invoiceKey[:])
 	if err != nil {
 		return 0, err
 	}
@@ -767,7 +751,6 @@ func putInvoice(invoices, invoiceIndex, addIndex *bolt.Bucket,
 	byteOrder.PutUint64(seqNoBytes[:], nextAddSeqNo)
 	if err := addIndex.Put(seqNoBytes[:], invoiceKey[:]); err != nil {
 		return 0, err
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 	}
 
 	i.AddIndex = nextAddSeqNo
@@ -844,9 +827,9 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 		return err
 	}
 
-<<<<<<< HEAD
 	if err := binary.Write(w, byteOrder, i.Terms.ExternalPreimage); err != nil {
-=======
+		return err
+	}
 	if err := binary.Write(w, byteOrder, i.AddIndex); err != nil {
 		return err
 	}
@@ -854,7 +837,6 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 		return err
 	}
 	if err := binary.Write(w, byteOrder, int64(i.AmtPaid)); err != nil {
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 		return err
 	}
 
@@ -912,7 +894,7 @@ func deserializeInvoice(r io.Reader) (Invoice, error) {
 	}
 
 	if _, err := io.ReadFull(r, invoice.Terms.PaymentHash[:]); err != nil {
-		return nil, err
+		return invoice, err
 	}
 
 	var scratch [8]byte
@@ -936,7 +918,7 @@ func deserializeInvoice(r io.Reader) (Invoice, error) {
 	}
 
 	if err := binary.Read(r, byteOrder, &invoice.Terms.ExternalPreimage); err != nil {
-		return nil, err
+		return invoice, err
 	}
 
 	if !invoice.Terms.ExternalPreimage {
@@ -1005,7 +987,7 @@ func addInvoicePreimage(invoices *bolt.Bucket, invoiceNum []byte,
 	// Only allow setting a preimage on invoices that are true External Preimage
 	// invoices
 	if !invoice.Terms.ExternalPreimage {
-		return fmt.Errorf("Invoices without an ExternalPreimage flag cannot have "+
+		return fmt.Errorf("Invoices without an ExternalPreimage flag cannot have " +
 			"their preimage modified.")
 	}
 
@@ -1020,7 +1002,7 @@ func addInvoicePreimage(invoices *bolt.Bucket, invoiceNum []byte,
 	invoice.Terms.PaymentPreimage = paymentPreimage
 
 	var buf bytes.Buffer
-	if err := serializeInvoice(&buf, invoice); err != nil {
+	if err := serializeInvoice(&buf, &invoice); err != nil {
 		return nil
 	}
 

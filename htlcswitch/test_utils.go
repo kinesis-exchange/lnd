@@ -750,7 +750,7 @@ func (n *threeHopNetwork) makePayment(sendingPeer, receivingPeer lnpeer.Peer,
 // makeExtpreimagePayment is a copy of makePayment for external preimages
 // to enable testing while keeping diffs with upstream contained.
 func (n *threeHopNetwork) makeExtpreimagePayment(sendingPeer,
-	receivingPeer lnpeer.Peer, firstHopPub [33]byte, hops []ForwardingInfo,
+	receivingPeer lnpeer.Peer, firstHopPub lnwire.ShortChannelID, hops []ForwardingInfo,
 	invoiceAmt, htlcAmt lnwire.MilliSatoshi, timelock uint32,
 	preimage [32]byte) *paymentResponse {
 

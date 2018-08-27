@@ -2422,7 +2422,6 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 				continue
 			}
 
-<<<<<<< HEAD
 			var zeroPreimage [32]byte
 			var preimage [32]byte
 
@@ -2490,14 +2489,10 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 				return false
 			}
 
-			err = l.channel.SettleHTLC(preimage,
-				pd.HtlcIndex, pd.SourceRef, nil, nil)
-=======
-			preimage := invoice.Terms.PaymentPreimage
 			err = l.channel.SettleHTLC(
 				preimage, pd.HtlcIndex, pd.SourceRef, nil, nil,
 			)
->>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
+
 			if err != nil {
 				l.fail(LinkFailureError{code: ErrInternalError},
 					"unable to settle htlc: %v", err)
