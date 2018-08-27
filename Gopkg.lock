@@ -177,6 +177,7 @@
   packages = [
     "jsonpb",
     "proto",
+    "protoc-gen-go/descriptor",
     "ptypes/any",
     "ptypes/struct"
   ]
@@ -365,7 +366,10 @@
 
 [[projects]]
   name = "google.golang.org/genproto"
-  packages = ["googleapis/rpc/status"]
+  packages = [
+    "googleapis/api/annotations",
+    "googleapis/rpc/status"
+  ]
   revision = "df60624c1e9b9d2973e889c7a1cff73155da81c4"
 
 [[projects]]
@@ -412,6 +416,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2b8653e3b8010a456de38836b956fbd4b49e302cc52483ec361a3cc8ca3b0d6f"
+  inputs-digest = "afc85462d10afc5ed8244bda2bc672a8f65d9a844f3b58fac29033f9095eef4c"
   solver-name = "gps-cdcl"
   solver-version = 1
