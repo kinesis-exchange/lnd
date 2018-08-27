@@ -9,12 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/fastsha256"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/lnwire"
-	"github.com/roasbeef/btcutil"
 )
 
 func genPreimage() ([32]byte, error) {
@@ -25,12 +25,69 @@ func genPreimage() ([32]byte, error) {
 	return preimage, nil
 }
 
+// TestSwitchAddDuplicateLink tests that the switch will reject duplicate links
+// for both pending and live links. It also tests that we can successfully
+// add a link after having removed it.
+func TestSwitchAddDuplicateLink(t *testing.T) {
+	t.Parallel()
+
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
+	if err != nil {
+		t.Fatalf("unable to create alice server: %v", err)
+	}
+
+	s, err := initSwitchWithDB(testStartingHeight, nil)
+	if err != nil {
+		t.Fatalf("unable to init switch: %v", err)
+	}
+	if err := s.Start(); err != nil {
+		t.Fatalf("unable to start switch: %v", err)
+	}
+	defer s.Stop()
+
+	chanID1, _, aliceChanID, _ := genIDs()
+
+	pendingChanID := lnwire.ShortChannelID{}
+
+	aliceChannelLink := newMockChannelLink(
+		s, chanID1, pendingChanID, alicePeer, false,
+	)
+	if err := s.AddLink(aliceChannelLink); err != nil {
+		t.Fatalf("unable to add alice link: %v", err)
+	}
+
+	// Alice should have a pending link, adding again should fail.
+	if err := s.AddLink(aliceChannelLink); err == nil {
+		t.Fatalf("adding duplicate link should have failed")
+	}
+
+	// Update the short chan id of the channel, so that the link goes live.
+	aliceChannelLink.setLiveShortChanID(aliceChanID)
+	err = s.UpdateShortChanID(chanID1)
+	if err != nil {
+		t.Fatalf("unable to update alice short_chan_id: %v", err)
+	}
+
+	// Alice should have a live link, adding again should fail.
+	if err := s.AddLink(aliceChannelLink); err == nil {
+		t.Fatalf("adding duplicate link should have failed")
+	}
+
+	// Remove the live link to ensure the indexes are cleared.
+	s.RemoveLink(chanID1)
+
+	// Alice has no links, adding should succeed.
+	if err := s.AddLink(aliceChannelLink); err != nil {
+		t.Fatalf("unable to add alice link: %v", err)
+	}
+}
+
 // TestSwitchSendPending checks the inability of htlc switch to forward adds
 // over pending links, and the UpdateShortChanID makes a pending link live.
 func TestSwitchSendPending(t *testing.T) {
 	t.Parallel()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
@@ -125,11 +182,11 @@ func TestSwitchSendPending(t *testing.T) {
 func TestSwitchForward(t *testing.T) {
 	t.Parallel()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -230,11 +287,11 @@ func TestSwitchForwardFailAfterFullAdd(t *testing.T) {
 
 	chanID1, chanID2, aliceChanID, bobChanID := genIDs()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -421,11 +478,11 @@ func TestSwitchForwardSettleAfterFullAdd(t *testing.T) {
 
 	chanID1, chanID2, aliceChanID, bobChanID := genIDs()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -615,11 +672,11 @@ func TestSwitchForwardDropAfterFullAdd(t *testing.T) {
 
 	chanID1, chanID2, aliceChanID, bobChanID := genIDs()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -778,11 +835,11 @@ func TestSwitchForwardFailAfterHalfAdd(t *testing.T) {
 
 	chanID1, chanID2, aliceChanID, bobChanID := genIDs()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -936,11 +993,11 @@ func TestSwitchForwardCircuitPersistence(t *testing.T) {
 
 	chanID1, chanID2, aliceChanID, bobChanID := genIDs()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -1167,11 +1224,11 @@ func TestSkipIneligibleLinksMultiHopForward(t *testing.T) {
 
 	var packet *htlcPacket
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -1237,7 +1294,7 @@ func TestSkipIneligibleLinksLocalForward(t *testing.T) {
 
 	// We'll create a single link for this test, marking it as being unable
 	// to forward form the get go.
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
@@ -1289,11 +1346,11 @@ func TestSkipIneligibleLinksLocalForward(t *testing.T) {
 func TestSwitchCancel(t *testing.T) {
 	t.Parallel()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -1402,11 +1459,11 @@ func TestSwitchAddSamePayment(t *testing.T) {
 
 	chanID1, chanID2, aliceChanID, bobChanID := genIDs()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
-	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil)
+	bobPeer, err := newMockServer(t, "bob", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create bob server: %v", err)
 	}
@@ -1561,7 +1618,7 @@ func TestSwitchAddSamePayment(t *testing.T) {
 func TestSwitchSendPayment(t *testing.T) {
 	t.Parallel()
 
-	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil)
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
 	if err != nil {
 		t.Fatalf("unable to create alice server: %v", err)
 	}
