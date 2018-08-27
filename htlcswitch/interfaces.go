@@ -1,26 +1,32 @@
 package htlcswitch
 
 import (
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/lnpeer"
 	"github.com/lightningnetwork/lnd/lnwire"
-	"github.com/roasbeef/btcd/chaincfg/chainhash"
 )
 
 // InvoiceDatabase is an interface which represents the persistent subsystem
 // which may search, lookup and settle invoices.
 type InvoiceDatabase interface {
 	// LookupInvoice attempts to look up an invoice according to its 32
-	// byte payment hash.
-	LookupInvoice(chainhash.Hash) (channeldb.Invoice, error)
+	// byte payment hash. This method should also reutrn the min final CLTV
+	// delta for this invoice. We'll use this to ensure that the HTLC
+	// extended to us gives us enough time to settle as we prescribe.
+	LookupInvoice(chainhash.Hash) (channeldb.Invoice, uint32, error)
 
 	// SettleInvoice attempts to mark an invoice corresponding to the
 	// passed payment hash as fully settled.
+<<<<<<< HEAD
 	SettleInvoice(chainhash.Hash) error
 
 	// AddInvoicePreimage attempts to add a local preimage to an invoice
 	// that had an external preimage.
 	AddInvoicePreimage(chainhash.Hash, [32]byte) error
+=======
+	SettleInvoice(payHash chainhash.Hash, paidAmount lnwire.MilliSatoshi) error
+>>>>>>> 26f68da5b2883885fcf6a8e79b3fc9bb12cc9eef
 }
 
 // ChannelLink is an interface which represents the subsystem for managing the
