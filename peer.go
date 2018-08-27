@@ -9,6 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/connmgr"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/brontide"
@@ -16,14 +21,11 @@ import (
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contractcourt"
 	"github.com/lightningnetwork/lnd/htlcswitch"
+	"github.com/lightningnetwork/lnd/lnpeer"
 	"github.com/lightningnetwork/lnd/lnrpc"
 	"github.com/lightningnetwork/lnd/lnwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
-	"github.com/roasbeef/btcd/btcec"
-	"github.com/roasbeef/btcd/chaincfg/chainhash"
-	"github.com/roasbeef/btcd/connmgr"
-	"github.com/roasbeef/btcd/txscript"
-	"github.com/roasbeef/btcd/wire"
+	"github.com/lightningnetwork/lnd/ticker"
 )
 
 var (
@@ -110,13 +112,12 @@ type peer struct {
 	addr        *lnwire.NetAddress
 	pubKeyBytes [33]byte
 
-	inbound bool
+	// startTime is the time this peer connection was successfully
+	// established. It will be zero for peers that did not successfuly
+	// Start().
+	startTime time.Time
 
-	// This mutex protects all the stats below it.
-	sync.RWMutex
-	timeConnected time.Time
-	lastSend      time.Time
-	lastRecv      time.Time
+	inbound bool
 
 	// sendQueue is the channel which is used to queue outgoing to be
 	// written onto the wire. Note that this channel is unbuffered.
@@ -184,6 +185,9 @@ type peer struct {
 	quit      chan struct{}
 	wg        sync.WaitGroup
 }
+
+// A compile-time check to ensure that peer satisfies the lnpeer.Peer interface.
+var _ lnpeer.Peer = (*peer)(nil)
 
 // newPeer creates a new peer from an establish connection object, and a
 // pointer to the main server.
@@ -299,6 +303,8 @@ func (p *peer) Start() error {
 		return fmt.Errorf("unable to load channels: %v", err)
 	}
 
+	p.startTime = time.Now()
+
 	p.wg.Add(5)
 	go p.queueHandler()
 	go p.writeHandler()
@@ -329,9 +335,9 @@ func (p *peer) loadActiveChannels(chans []*channeldb.OpenChannel) error {
 
 		// Skip adding any permanently irreconcilable channels to the
 		// htlcswitch.
-		if dbChan.ChanStatus != channeldb.Default {
+		if dbChan.ChanStatus() != channeldb.Default {
 			peerLog.Warnf("ChannelPoint(%v) has status %v, won't "+
-				"start.", chanPoint, dbChan.ChanStatus)
+				"start.", chanPoint, dbChan.ChanStatus())
 			lnChan.Stop()
 			continue
 		}
@@ -412,7 +418,8 @@ func (p *peer) loadActiveChannels(chans []*channeldb.OpenChannel) error {
 		)
 		if err != nil {
 			lnChan.Stop()
-			return err
+			return fmt.Errorf("unable to add link %v to switch: %v",
+				chanPoint, err)
 		}
 
 		p.activeChanMtx.Lock()
@@ -462,11 +469,7 @@ func (p *peer) addLink(chanPoint *wire.OutPoint,
 			// mailboxes such that we can safely force close
 			// without the link being added again and updates being
 			// applied.
-			err := p.server.htlcSwitch.RemoveLink(chanID)
-			if err != nil {
-				peerLog.Errorf("unable to stop link(%v): %v",
-					shortChanID, err)
-			}
+			p.server.htlcSwitch.RemoveLink(chanID)
 
 			// If the error encountered was severe enough, we'll
 			// now force close the channel.
@@ -539,12 +542,10 @@ func (p *peer) addLink(chanPoint *wire.OutPoint,
 				*chanPoint, signals,
 			)
 		},
-		OnChannelFailure: onChannelFailure,
-		SyncStates:       syncStates,
-		BatchTicker: htlcswitch.NewBatchTicker(
-			time.NewTicker(50 * time.Millisecond)),
-		FwdPkgGCTicker: htlcswitch.NewBatchTicker(
-			time.NewTicker(time.Minute)),
+		OnChannelFailure:    onChannelFailure,
+		SyncStates:          syncStates,
+		BatchTicker:         ticker.New(50 * time.Millisecond),
+		FwdPkgGCTicker:      ticker.New(time.Minute),
 		BatchSize:           10,
 		UnsafeReplay:        cfg.UnsafeReplay,
 		MinFeeUpdateTimeout: htlcswitch.DefaultMinLinkFeeUpdateTimeout,
@@ -552,6 +553,12 @@ func (p *peer) addLink(chanPoint *wire.OutPoint,
 	}
 
 	link := htlcswitch.NewChannelLink(linkCfg, lnChan)
+
+	// Before adding our new link, purge the switch of any pending or live
+	// links going by the same channel id. If one is found, we'll shut it
+	// down to ensure that the mailboxes are only ever under the control of
+	// one link.
+	p.server.htlcSwitch.RemoveLink(link.ChanID())
 
 	// With the channel link created, we'll now notify the htlc switch so
 	// this channel can be used to dispatch local payments and also
@@ -574,7 +581,7 @@ func (p *peer) Disconnect(reason error) {
 		return
 	}
 
-	peerLog.Tracef("Disconnecting %s, reason: %v", p, reason)
+	peerLog.Debugf("Disconnecting %s, reason: %v", p, reason)
 
 	// Ensure that the TCP connection is properly closed before continuing.
 	p.conn.Close()
@@ -908,15 +915,15 @@ out:
 			p.queueMsg(lnwire.NewPong(pongBytes), nil)
 
 		case *lnwire.OpenChannel:
-			p.server.fundingMgr.processFundingOpen(msg, p.addr)
+			p.server.fundingMgr.processFundingOpen(msg, p)
 		case *lnwire.AcceptChannel:
-			p.server.fundingMgr.processFundingAccept(msg, p.addr)
+			p.server.fundingMgr.processFundingAccept(msg, p)
 		case *lnwire.FundingCreated:
-			p.server.fundingMgr.processFundingCreated(msg, p.addr)
+			p.server.fundingMgr.processFundingCreated(msg, p)
 		case *lnwire.FundingSigned:
-			p.server.fundingMgr.processFundingSigned(msg, p.addr)
+			p.server.fundingMgr.processFundingSigned(msg, p)
 		case *lnwire.FundingLocked:
-			p.server.fundingMgr.processFundingLocked(msg, p.addr)
+			p.server.fundingMgr.processFundingLocked(msg, p)
 
 		case *lnwire.Shutdown:
 			select {
@@ -932,8 +939,9 @@ out:
 			}
 
 		case *lnwire.Error:
-			switch {
+			key := p.addr.IdentityKey
 
+			switch {
 			// In the case of an all-zero channel ID we want to
 			// forward the error to all channels with this peer.
 			case msg.ChanID == lnwire.ConnectionWideID:
@@ -949,8 +957,8 @@ out:
 			// If the channel ID for the error message corresponds
 			// to a pending channel, then the funding manager will
 			// handle the error.
-			case p.server.fundingMgr.IsPendingChannel(msg.ChanID, p.addr):
-				p.server.fundingMgr.processFundingError(msg, p.addr)
+			case p.server.fundingMgr.IsPendingChannel(msg.ChanID, key):
+				p.server.fundingMgr.processFundingError(msg, key)
 
 			// If not we hand the error to the channel link for
 			// this channel.
@@ -1521,8 +1529,8 @@ out:
 			)
 			if err != nil {
 				peerLog.Errorf("can't register new channel "+
-					"link(%v) with NodeKey(%x): %v", chanPoint,
-					p.PubKey(), err)
+					"link(%v) with NodeKey(%x)", chanPoint,
+					p.PubKey())
 			}
 
 			close(newChanReq.done)
@@ -1655,17 +1663,12 @@ func (p *peer) fetchActiveChanCloser(chanID lnwire.ChannelID) (*channelCloser, e
 		// In order to begin fee negotiations, we'll first compute our
 		// target ideal fee-per-kw. We'll set this to a lax value, as
 		// we weren't the ones that initiated the channel closure.
-		feePerVSize, err := p.server.cc.feeEstimator.EstimateFeePerVSize(6)
+		feePerKw, err := p.server.cc.feeEstimator.EstimateFeePerKW(6)
 		if err != nil {
 			peerLog.Errorf("unable to query fee estimator: %v", err)
 
 			return nil, fmt.Errorf("unable to estimate fee")
 		}
-
-		// We'll then convert the sat per weight to sat per k/w as this
-		// is the native unit used within the protocol when dealing
-		// with fees.
-		targetFeePerKw := feePerVSize.FeePerKWeight()
 
 		_, startingHeight, err := p.server.cc.chainIO.GetBestBlock()
 		if err != nil {
@@ -1678,10 +1681,11 @@ func (p *peer) fetchActiveChanCloser(chanID lnwire.ChannelID) (*channelCloser, e
 				channel:           channel,
 				unregisterChannel: p.server.htlcSwitch.RemoveLink,
 				broadcastTx:       p.server.cc.wallet.PublishTransaction,
+				disableChannel:    p.server.disableChannel,
 				quit:              p.quit,
 			},
 			deliveryAddr,
-			targetFeePerKw,
+			feePerKw,
 			uint32(startingHeight),
 			nil,
 		)
@@ -1693,9 +1697,6 @@ func (p *peer) fetchActiveChanCloser(chanID lnwire.ChannelID) (*channelCloser, e
 
 // handleLocalCloseReq kicks-off the workflow to execute a cooperative or
 // forced unilateral closure of the channel initiated by a local subsystem.
-//
-// TODO(roasbeef): if no more active channels with peer call Remove on connMgr
-// with peerID
 func (p *peer) handleLocalCloseReq(req *htlcswitch.ChanClose) {
 	chanID := lnwire.NewChanIDFromOutPoint(req.ChanPoint)
 
@@ -1734,11 +1735,13 @@ func (p *peer) handleLocalCloseReq(req *htlcswitch.ChanClose) {
 			req.Err <- err
 			return
 		}
+
 		chanCloser := newChannelCloser(
 			chanCloseCfg{
 				channel:           channel,
 				unregisterChannel: p.server.htlcSwitch.RemoveLink,
 				broadcastTx:       p.server.cc.wallet.PublishTransaction,
+				disableChannel:    p.server.disableChannel,
 				quit:              p.quit,
 			},
 			deliveryAddr,
@@ -1835,7 +1838,7 @@ func (p *peer) finalizeChanClosure(chanCloser *channelCloser) {
 	}
 
 	go waitForChanToClose(chanCloser.negotiationHeight, notifier, errChan,
-		chanPoint, &closingTxid, func() {
+		chanPoint, &closingTxid, closingTx.TxOut[0].PkScript, func() {
 			// Respond to the local subsystem which requested the
 			// channel closure.
 			if closeReq != nil {
@@ -1848,6 +1851,18 @@ func (p *peer) finalizeChanClosure(chanCloser *channelCloser) {
 					},
 				}
 			}
+
+			// Remove the persistent connection to this peer if we
+			// no longer have open channels with them.
+			p.activeChanMtx.Lock()
+			numActiveChans := len(p.activeChannels)
+			p.activeChanMtx.Unlock()
+
+			if numActiveChans == 0 {
+				p.server.prunePersistentPeerConnection(
+					p.pubKeyBytes,
+				)
+			}
 		})
 }
 
@@ -1858,15 +1873,16 @@ func (p *peer) finalizeChanClosure(chanCloser *channelCloser) {
 // the function, then it will be sent over the errChan.
 func waitForChanToClose(bestHeight uint32, notifier chainntnfs.ChainNotifier,
 	errChan chan error, chanPoint *wire.OutPoint,
-	closingTxID *chainhash.Hash, cb func()) {
+	closingTxID *chainhash.Hash, closeScript []byte, cb func()) {
 
 	peerLog.Infof("Waiting for confirmation of cooperative close of "+
 		"ChannelPoint(%v) with txid: %v", chanPoint,
 		closingTxID)
 
 	// TODO(roasbeef): add param for num needed confs
-	confNtfn, err := notifier.RegisterConfirmationsNtfn(closingTxID, 1,
-		bestHeight)
+	confNtfn, err := notifier.RegisterConfirmationsNtfn(
+		closingTxID, closeScript, 1, bestHeight,
+	)
 	if err != nil {
 		if errChan != nil {
 			errChan <- err
@@ -1901,19 +1917,15 @@ func (p *peer) WipeChannel(chanPoint *wire.OutPoint) error {
 	if channel, ok := p.activeChannels[chanID]; ok {
 		channel.Stop()
 		delete(p.activeChannels, chanID)
+		if len(p.activeChannels) == 0 {
+			p.server.prunePersistentPeerConnection(p.pubKeyBytes)
+		}
 	}
 	p.activeChanMtx.Unlock()
 
 	// Instruct the HtlcSwitch to close this link as the channel is no
 	// longer active.
-	if err := p.server.htlcSwitch.RemoveLink(chanID); err != nil {
-		if err == htlcswitch.ErrChannelLinkNotFound {
-			peerLog.Warnf("unable remove channel link with "+
-				"ChannelPoint(%v): %v", chanID, err)
-			return nil
-		}
-		return err
-	}
+	p.server.htlcSwitch.RemoveLink(chanID)
 
 	return nil
 }
@@ -1959,6 +1971,8 @@ func (p *peer) sendInitMsg() error {
 // SendMessage sends a variadic number of message to remote peer. The first
 // argument denotes if the method should block until the message has been sent
 // to the remote peer.
+//
+// NOTE: Part of the lnpeer.Peer interface.
 func (p *peer) SendMessage(sync bool, msgs ...lnwire.Message) error {
 	// Add all incoming messages to the outgoing queue. A list of error
 	// chans is populated for each message if the caller requested a sync
@@ -1991,13 +2005,62 @@ func (p *peer) SendMessage(sync bool, msgs ...lnwire.Message) error {
 }
 
 // PubKey returns the pubkey of the peer in compressed serialized format.
+//
+// NOTE: Part of the lnpeer.Peer interface.
 func (p *peer) PubKey() [33]byte {
 	return p.pubKeyBytes
 }
 
 // IdentityKey returns the public key of the remote peer.
+//
+// NOTE: Part of the lnpeer.Peer interface.
 func (p *peer) IdentityKey() *btcec.PublicKey {
 	return p.addr.IdentityKey
+}
+
+// Address returns the network address of the remote peer.
+//
+// NOTE: Part of the lnpeer.Peer interface.
+func (p *peer) Address() net.Addr {
+	return p.addr.Address
+}
+
+// AddNewChannel adds a new channel to the peer. The channel should fail to be
+// added if the cancel channel is closed.
+//
+// NOTE: Part of the lnpeer.Peer interface.
+func (p *peer) AddNewChannel(channel *lnwallet.LightningChannel,
+	cancel <-chan struct{}) error {
+
+	newChanDone := make(chan struct{})
+	newChanMsg := &newChannelMsg{
+		channel: channel,
+		done:    newChanDone,
+	}
+
+	select {
+	case p.newChannels <- newChanMsg:
+	case <-cancel:
+		return errors.New("canceled adding new channel")
+	case <-p.quit:
+		return ErrPeerExiting
+	}
+
+	// We pause here to wait for the peer to recognize the new channel
+	// before we close the channel barrier corresponding to the channel.
+	select {
+	case <-newChanDone:
+	case <-p.quit:
+		return ErrPeerExiting
+	}
+
+	return nil
+}
+
+// StartTime returns the time at which the connection was established if the
+// peer started successfully, and zero otherwise.
+func (p *peer) StartTime() time.Time {
+	return p.startTime
 }
 
 // TODO(roasbeef): make all start/stop mutexes a CAS
@@ -2014,8 +2077,8 @@ func fetchLastChanUpdate(s *server,
 		}
 
 		if edge1 == nil || edge2 == nil {
-			return nil, errors.Errorf("unable to find "+
-				"channel by ShortChannelID(%v)", cid)
+			return nil, fmt.Errorf("unable to find channel by "+
+				"ShortChannelID(%v)", cid)
 		}
 
 		// If we're the outgoing node on the first edge, then that
@@ -2028,27 +2091,6 @@ func fetchLastChanUpdate(s *server,
 			local = edge1
 		}
 
-		update := lnwire.ChannelUpdate{
-			ChainHash:       info.ChainHash,
-			ShortChannelID:  lnwire.NewShortChanIDFromInt(local.ChannelID),
-			Timestamp:       uint32(local.LastUpdate.Unix()),
-			Flags:           local.Flags,
-			TimeLockDelta:   local.TimeLockDelta,
-			HtlcMinimumMsat: local.MinHTLC,
-			BaseFee:         uint32(local.FeeBaseMSat),
-			FeeRate:         uint32(local.FeeProportionalMillionths),
-		}
-		update.Signature, err = lnwire.NewSigFromRawSignature(local.SigBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		hswcLog.Tracef("Sending latest channel_update: %v",
-			newLogClosure(func() string {
-				return spew.Sdump(update)
-			}),
-		)
-
-		return &update, nil
+		return extractChannelUpdate(info, local)
 	}
 }

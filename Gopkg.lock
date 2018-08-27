@@ -10,7 +10,7 @@
     "ghash",
     "internal/modes"
   ]
-  revision = "e06297f34865a50b8e473105e52cb64ad1b55da8"
+  revision = "c0276d75487ef7aceab140c9eb31601dd7d18bd4"
 
 [[projects]]
   branch = "master"
@@ -43,13 +43,13 @@
     ".",
     "chacha"
   ]
-  revision = "c8d29375923a8e1d2a0f0dc0fc1d8a0aba5b97ba"
+  revision = "8b13a72661dae6e9e5dea04f344f0dc95ea29547"
 
 [[projects]]
-  branch = "master"
   name = "github.com/aead/siphash"
   packages = ["."]
-  revision = "e404fcfc888570cadd1610538e2dbc89f66af814"
+  revision = "83563a290f60225eb120d724600b9690c3fb536f"
+  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/awalterschulze/gographviz"
@@ -63,9 +63,62 @@
   revision = "761fd5fbb34e4c2c138c280395b65b48e4ff5a53"
 
 [[projects]]
+  name = "github.com/btcsuite/btcd"
+  packages = [
+    "addrmgr",
+    "blockchain",
+    "btcec",
+    "btcjson",
+    "chaincfg",
+    "chaincfg/chainhash",
+    "connmgr",
+    "database",
+    "integration/rpctest",
+    "peer",
+    "rpcclient",
+    "txscript",
+    "wire"
+  ]
+  revision = "f899737d7f2764dc13e4d01ff00108ec58f766a9"
+
+[[projects]]
   name = "github.com/btcsuite/btclog"
   packages = ["."]
   revision = "84c8d2346e9fc8c7b947e243b9c24e6df9fd206a"
+
+[[projects]]
+  name = "github.com/btcsuite/btcutil"
+  packages = [
+    ".",
+    "base58",
+    "bech32",
+    "gcs",
+    "gcs/builder",
+    "hdkeychain",
+    "txsort"
+  ]
+  revision = "ab6388e0c60ae4834a1f57511e20c17b5f78be4b"
+
+[[projects]]
+  name = "github.com/btcsuite/btcwallet"
+  packages = [
+    "chain",
+    "internal/helpers",
+    "internal/legacy/keystore",
+    "internal/legacy/rename",
+    "internal/prompt",
+    "internal/zero",
+    "snacl",
+    "waddrmgr",
+    "wallet",
+    "wallet/internal/txsizes",
+    "wallet/txauthor",
+    "wallet/txrules",
+    "walletdb",
+    "walletdb/bdb",
+    "wtxmgr"
+  ]
+  revision = "1ede0a1a66bad8f7db796615e496a0a0faba5182"
 
 [[projects]]
   branch = "master"
@@ -86,7 +139,6 @@
     "nacl/secretbox",
     "pbkdf2",
     "poly1305",
-    "ripemd160",
     "salsa20/salsa",
     "scrypt",
     "ssh/terminal"
@@ -165,7 +217,7 @@
   branch = "master"
   name = "github.com/juju/loggo"
   packages = ["."]
-  revision = "8232ab8918d91c72af1a9fb94d3edbe31d88b790"
+  revision = "584905176618da46b895b176c721b02c476b6993"
 
 [[projects]]
   name = "github.com/kkdai/bstream"
@@ -183,19 +235,19 @@
   packages = [
     ".",
     "filterdb",
-    "headerfs"
+    "headerfs",
+    "headerlist"
   ]
-  revision = "36d9a509ff4ea1e916a73c6f1c2b784c1faf11ed"
+  revision = "b451667d69910cd20995452c56e02441896a3349"
 
 [[projects]]
   name = "github.com/lightningnetwork/lightning-onion"
   packages = ["."]
-  revision = "e5ab5d7396020384f864452ec3c69b56264f1092"
+  revision = "ac4d9da8f1d67c95f1fafdc65e1a4902d6f5a940"
 
 [[projects]]
   name = "github.com/ltcsuite/ltcd"
   packages = [
-    "btcjson",
     "chaincfg",
     "chaincfg/chainhash",
     "wire"
@@ -213,61 +265,8 @@
 [[projects]]
   name = "github.com/processout/grpc-go-pool"
   packages = ["."]
-  revision = "6f31a97b80d10a7bbefa392828d1a7f1b50a40fa"
-  version = "v1.2"
-
-[[projects]]
-  name = "github.com/roasbeef/btcd"
-  packages = [
-    "addrmgr",
-    "blockchain",
-    "btcec",
-    "btcjson",
-    "chaincfg",
-    "chaincfg/chainhash",
-    "connmgr",
-    "database",
-    "integration/rpctest",
-    "peer",
-    "rpcclient",
-    "txscript",
-    "wire"
-  ]
-  revision = "a03db407e40d3b66ea29984263bbc8bf4d2f04c4"
-
-[[projects]]
-  name = "github.com/roasbeef/btcutil"
-  packages = [
-    ".",
-    "base58",
-    "bech32",
-    "gcs",
-    "gcs/builder",
-    "hdkeychain",
-    "txsort"
-  ]
-  revision = "dfb640c57141f1c2113b92b4b16d2a89c30dd258"
-
-[[projects]]
-  name = "github.com/roasbeef/btcwallet"
-  packages = [
-    "chain",
-    "internal/helpers",
-    "internal/legacy/keystore",
-    "internal/legacy/rename",
-    "internal/prompt",
-    "internal/zero",
-    "snacl",
-    "waddrmgr",
-    "wallet",
-    "wallet/internal/txsizes",
-    "wallet/txauthor",
-    "wallet/txrules",
-    "walletdb",
-    "walletdb/bdb",
-    "wtxmgr"
-  ]
-  revision = "ccd48bb4720f2baeaa795cac81264f6ced2da4c7"
+  revision = "dd880f820cb22b1abcb14d6f98c3812ac05b3758"
+  version = "v1.2.1"
 
 [[projects]]
   branch = "master"
@@ -326,10 +325,11 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = [
+    "cpu",
     "unix",
     "windows"
   ]
-  revision = "c28acc882ebcbfbe8ce9f0f14b9ac26ee138dd51"
+  revision = "4910a1d54f876d7b22162a85f4d066d3ee649450"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -394,10 +394,10 @@
   revision = "b3ddf786825de56a4178401b7e174ee332173b66"
 
 [[projects]]
-  branch = "v1"
   name = "gopkg.in/errgo.v1"
   packages = ["."]
-  revision = "442357a80af5c6bf9b6d51ae791a39c3421004f3"
+  revision = "b20caedf0710d0988e92b5f2d76843ad1f231f2d"
+  version = "v1.0.0"
 
 [[projects]]
   name = "gopkg.in/macaroon-bakery.v2"
@@ -416,6 +416,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "85543822e0de24ad5fcfab2cff7a68f48b1581f90cae93a815741a151105d004"
+  inputs-digest = "afc85462d10afc5ed8244bda2bc672a8f65d9a844f3b58fac29033f9095eef4c"
   solver-name = "gps-cdcl"
   solver-version = 1
