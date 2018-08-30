@@ -253,9 +253,9 @@ func (d *DB) AddInvoice(newInvoice *Invoice) (uint64, error) {
 			return err
 		}
 
-		// Ensure that an invoice an identical payment hash doesn't
+		// Ensure that an identical payment hash doesn't
 		// already exist within the index.
-		if invoiceIndex.Get(paymentHash[:]) != nil {
+		if newInvoice.Terms.ExternalPreimage != true && invoiceIndex.Get(paymentHash[:]) != nil {
 			return ErrDuplicateInvoice
 		}
 
@@ -826,10 +826,6 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 	if err := binary.Write(w, byteOrder, i.Terms.Settled); err != nil {
 		return err
 	}
-
-	if err := binary.Write(w, byteOrder, i.Terms.ExternalPreimage); err != nil {
-		return err
-	}
 	if err := binary.Write(w, byteOrder, i.AddIndex); err != nil {
 		return err
 	}
@@ -837,6 +833,9 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 		return err
 	}
 	if err := binary.Write(w, byteOrder, int64(i.AmtPaid)); err != nil {
+		return err
+	}
+	if err := binary.Write(w, byteOrder, i.Terms.ExternalPreimage); err != nil {
 		return err
 	}
 

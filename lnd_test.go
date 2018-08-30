@@ -720,6 +720,12 @@ func testUnconfirmedChannelFunding(net *lntest.NetworkHarness, t *harnessTest) {
 	// together. The funding flow should select Carol's unconfirmed output
 	// as she doesn't have any other funds since it's a new node.
 	ctxt, _ = context.WithTimeout(ctxb, timeout)
+
+	// We sleep here because we have disabled nodes from starting until chain has synced
+	// for all networks. This used to be disabled for simnet, which allowed this test to complete
+	// but now we sleep for an arbituary number
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxt, carol, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -1032,6 +1038,9 @@ func testUpdateChannelPolicy(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to send coins to carol: %v", err)
 	}
 
+	// Wait until the nodes are up
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, carol, net.Bob); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -1291,6 +1300,9 @@ func testUpdateChannelPolicy(net *lntest.NetworkHarness, t *harnessTest) {
 	if err != nil {
 		t.Fatalf("unable to send payment: %v", err)
 	}
+
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
 
 	// We'll now open a channel from Alice directly to Carol.
 	if err := net.ConnectNodes(ctxb, net.Alice, carol); err != nil {
@@ -1672,6 +1684,9 @@ func testDisconnectingTargetPeer(net *lntest.NetworkHarness, t *harnessTest) {
 	// Check zero peer connections.
 	assertNumConnections(ctxb, t, net.Alice, net.Bob, 0)
 
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
+
 	// Finally, re-connect both nodes.
 	ctxt, _ = context.WithTimeout(ctxb, timeout)
 	if err := net.ConnectNodes(ctxt, net.Alice, net.Bob); err != nil {
@@ -1715,6 +1730,9 @@ func testChannelFundingPersistence(net *lntest.NetworkHarness, t *harnessTest) {
 
 	// Clean up carol's node when the test finishes.
 	defer shutdownAndAssert(net, t, carol)
+
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
 
 	ctxt, _ := context.WithTimeout(ctxb, timeout)
 	if err := net.ConnectNodes(ctxt, net.Alice, carol); err != nil {
@@ -2042,6 +2060,9 @@ func testChannelForceClosure(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
 
 	// We must let Alice have an open channel before she can send a node
 	// announcement, so we open a channel with Carol,
@@ -2780,6 +2801,9 @@ func testSphinxReplayPersistence(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
 	}
@@ -3139,7 +3163,7 @@ func testListPayments(net *lntest.NetworkHarness, t *harnessTest) {
 	// expects a payment of 1000 satoshis from Alice paid via a particular
 	// preimage.
 	const paymentAmt = 1000
-	preimage := bytes.Repeat([]byte("B"), 32)
+	preimage := bytes.Repeat([]byte("C"), 32)
 	invoice := &lnrpc.Invoice{
 		Memo:      "testing",
 		RPreimage: preimage,
@@ -3392,6 +3416,9 @@ func testMultiHopPayments(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, dave, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -3427,6 +3454,11 @@ func testMultiHopPayments(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// We sleep here because we have disabled nodes from starting until chain has synced
+	// for all networks. This used to be disabled for simnet, which allowed this test to complete
+	// but now we sleep for an arbituary number
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
@@ -3830,6 +3862,9 @@ func testMultiHopSendToRoute(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, carol, net.Bob); err != nil {
 		t.Fatalf("unable to connect carol to alice: %v", err)
 	}
@@ -4037,6 +4072,9 @@ func testSendToRouteErrorPropagation(net *lntest.NetworkHarness, t *harnessTest)
 		t.Fatalf("unable to send coins to charlie: %v", err)
 	}
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, carol, charlie); err != nil {
 		t.Fatalf("unable to connect carol to alice: %v", err)
 	}
@@ -4162,6 +4200,9 @@ func testPrivateChannels(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, dave, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -4197,6 +4238,9 @@ func testPrivateChannels(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
@@ -4255,6 +4299,10 @@ func testPrivateChannels(net *lntest.NetworkHarness, t *harnessTest) {
 			}
 		}
 	}
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	// Now create a _private_ channel directly between Carol and
 	// Alice of 100k.
 	if err := net.ConnectNodes(ctxb, carol, net.Alice); err != nil {
@@ -4509,6 +4557,9 @@ func testInvoiceRoutingHints(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Alice, carol); err != nil {
 		t.Fatalf("unable to connect alice to carol: %v", err)
 	}
@@ -4531,6 +4582,9 @@ func testInvoiceRoutingHints(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Alice, dave); err != nil {
 		t.Fatalf("unable to connect alice to dave: %v", err)
 	}
@@ -4551,6 +4605,10 @@ func testInvoiceRoutingHints(net *lntest.NetworkHarness, t *harnessTest) {
 	if err != nil {
 		t.Fatalf("unable to create eve's node: %v", err)
 	}
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Alice, eve); err != nil {
 		t.Fatalf("unable to connect alice to eve: %v", err)
 	}
@@ -4725,6 +4783,9 @@ func testMultiHopOverPrivateChannels(net *lntest.NetworkHarness, t *harnessTest)
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Bob, carol); err != nil {
 		t.Fatalf("unable to connect bob to carol: %v", err)
 	}
@@ -4776,6 +4837,9 @@ func testMultiHopOverPrivateChannels(net *lntest.NetworkHarness, t *harnessTest)
 		t.Fatalf("unable to create dave's node: %v", err)
 	}
 	defer shutdownAndAssert(net, t, dave)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
@@ -5179,6 +5243,10 @@ func testMaxPendingChannels(net *lntest.NetworkHarness, t *harnessTest) {
 	defer shutdownAndAssert(net, t, carol)
 
 	ctx, _ = context.WithTimeout(context.Background(), timeout)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctx, net.Alice, carol); err != nil {
 		t.Fatalf("unable to connect carol to alice: %v", err)
 	}
@@ -5366,6 +5434,9 @@ func testFailingChannel(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// Let Alice connect and open a channel to Carol,
 	if err := net.ConnectNodes(ctxb, net.Alice, carol); err != nil {
@@ -5562,6 +5633,10 @@ func testGarbageCollectLinkNodes(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, carol)
 	ctxt, _ = context.WithTimeout(ctxb, timeout)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxt, net.Alice, carol); err != nil {
 		t.Fatalf("unable to connect alice and carol: %v", err)
 	}
@@ -5584,6 +5659,10 @@ func testGarbageCollectLinkNodes(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create dave's node: %v", err)
 	}
 	defer shutdownAndAssert(net, t, dave)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxt, net.Alice, dave); err != nil {
 		t.Fatalf("unable to connect alice to dave: %v", err)
 	}
@@ -5753,6 +5832,9 @@ func testRevokedCloseRetribution(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new carol node: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// We must let Bob communicate with Carol before they are able to open
 	// channel, so we connect Bob and Carol,
@@ -6036,6 +6118,9 @@ func testRevokedCloseRetributionZeroValueRemoteOutput(net *lntest.NetworkHarness
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	// We must let Dave have an open channel before she can send a node
 	// announcement, so we open a channel with Carol,
 	if err := net.ConnectNodes(ctxb, dave, carol); err != nil {
@@ -6303,6 +6388,9 @@ func testRevokedCloseRetributionRemoteHodl(net *lntest.NetworkHarness,
 		t.Fatalf("unable to create new dave node: %v", err)
 	}
 	defer shutdownAndAssert(net, t, dave)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// We must let Dave communicate with Carol before they are able to open
 	// channel, so we connect Dave and Carol,
@@ -6767,6 +6855,9 @@ func testDataLossProtection(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	// We must let Dave communicate with Carol before they are able to open
 	// channel, so we connect them.
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
@@ -6936,6 +7027,9 @@ func testDataLossProtection(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("db copy failed: %v", daveChan.NumUpdates)
 	}
 	assertNodeNumChannels(t, ctxb, dave, 1)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// Upon reconnection, the nodes should detect that Dave is out of sync.
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
@@ -7112,6 +7206,9 @@ func testHtlcErrorPropagation(net *lntest.NetworkHarness, t *harnessTest) {
 	if err != nil {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// Next, we'll create a connection from Bob to Carol, and open a
 	// channel between them so we have the topology: Alice -> Bob -> Carol.
@@ -7546,6 +7643,9 @@ out:
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Bob, carol); err != nil {
 		t.Fatalf("unable to connect bob to carol: %v", err)
 	}
@@ -7556,6 +7656,9 @@ out:
 			Amt: chanAmt,
 		},
 	)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// Reconnect Alice and Bob. This should result in the nodes syncing up
 	// their respective graph state, with the new addition being the
@@ -7640,6 +7743,9 @@ func testNodeAnnouncement(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, dave)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	// We must let Dave have an open channel before he can send a node
 	// announcement, so we open a channel with Bob,
@@ -8371,6 +8477,10 @@ func createThreeHopHodlNetwork(t *harnessTest,
 	if err != nil {
 		t.Fatalf("unable to create new node: %v", err)
 	}
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Bob, carol); err != nil {
 		t.Fatalf("unable to connect bob to carol: %v", err)
 	}
@@ -9953,6 +10063,9 @@ func testSwitchCircuitPersistence(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, dave, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -9990,6 +10103,9 @@ func testSwitchCircuitPersistence(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
@@ -10295,6 +10411,11 @@ func testSwitchOfflineDelivery(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// We sleep here because we have disabled nodes from starting until chain has synced
+	// for all networks. This used to be disabled for simnet, which allowed this test to complete
+	// but now we sleep for an arbituary number
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, dave, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -10332,6 +10453,9 @@ func testSwitchOfflineDelivery(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
@@ -10644,6 +10768,9 @@ func testSwitchOfflineDeliveryPersistence(net *lntest.NetworkHarness, t *harness
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, dave, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -10682,6 +10809,9 @@ func testSwitchOfflineDeliveryPersistence(net *lntest.NetworkHarness, t *harness
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, carol)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
@@ -11001,6 +11131,9 @@ func testSwitchOfflineDeliveryOutgoingOffline(
 	}
 	defer shutdownAndAssert(net, t, dave)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, dave, net.Alice); err != nil {
 		t.Fatalf("unable to connect dave to alice: %v", err)
 	}
@@ -11037,6 +11170,10 @@ func testSwitchOfflineDeliveryOutgoingOffline(
 	if err != nil {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
 	}
@@ -11283,6 +11420,9 @@ func testQueryRoutes(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, carol, net.Bob); err != nil {
 		t.Fatalf("unable to connect carol to bob: %v", err)
 	}
@@ -11305,6 +11445,9 @@ func testQueryRoutes(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create new nodes: %v", err)
 	}
 	defer shutdownAndAssert(net, t, dave)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
 
 	if err := net.ConnectNodes(ctxb, dave, carol); err != nil {
 		t.Fatalf("unable to connect dave to carol: %v", err)
@@ -11487,6 +11630,10 @@ func testRouteFeeCutoff(net *lntest.NetworkHarness, t *harnessTest) {
 	defer shutdownAndAssert(net, t, carol)
 
 	ctxt, _ = context.WithTimeout(ctxb, timeout)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxt, carol, net.Alice); err != nil {
 		t.Fatalf("unable to connect carol to alice: %v", err)
 	}
@@ -11512,6 +11659,10 @@ func testRouteFeeCutoff(net *lntest.NetworkHarness, t *harnessTest) {
 	defer shutdownAndAssert(net, t, dave)
 
 	ctxt, _ = context.WithTimeout(ctxb, timeout)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxt, dave, net.Bob); err != nil {
 		t.Fatalf("unable to connect dave to bob: %v", err)
 	}
@@ -11525,6 +11676,10 @@ func testRouteFeeCutoff(net *lntest.NetworkHarness, t *harnessTest) {
 
 	// Open a channel between Carol and Dave.
 	ctxt, _ = context.WithTimeout(ctxb, timeout)
+
+	// Wait until nodes sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxt, carol, dave); err != nil {
 		t.Fatalf("unable to connect carol to dave: %v", err)
 	}
@@ -11760,6 +11915,9 @@ func testSendUpdateDisableChannel(net *lntest.NetworkHarness, t *harnessTest) {
 	}
 	defer shutdownAndAssert(net, t, carol)
 
+	// wait for nodes to sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Alice, carol); err != nil {
 		t.Fatalf("unable to connect alice to carol: %v", err)
 	}
@@ -11810,6 +11968,10 @@ func testSendUpdateDisableChannel(net *lntest.NetworkHarness, t *harnessTest) {
 		t.Fatalf("unable to create dave's node: %v", err)
 	}
 	defer shutdownAndAssert(net, t, dave)
+
+	// wait for nodes to sync
+	time.Sleep(2 * time.Second)
+
 	if err := net.ConnectNodes(ctxb, net.Bob, dave); err != nil {
 		t.Fatalf("unable to connect bob to dave: %v", err)
 	}
@@ -12191,6 +12353,9 @@ func TestLightningNetworkDaemon(t *testing.T) {
 	if _, err := btcdHarness.Node.Generate(numBlocks); err != nil {
 		ht.Fatalf("unable to generate blocks: %v", err)
 	}
+
+	// We need to wait while chains sync
+	time.Sleep(2 * time.Second)
 
 	// With the btcd harness created, we can now complete the
 	// initialization of the network. args - list of lnd arguments,
