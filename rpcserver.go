@@ -2802,6 +2802,7 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 
 	preimage := invoice.Terms.PaymentPreimage
 	satAmt := invoice.Terms.Value.ToSatoshis()
+	amtPaid := invoice.AmtPaid.ToSatoshis()
 
 	return &lnrpc.Invoice{
 		Memo:             string(invoice.Memo[:]),
@@ -2821,7 +2822,7 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 		RouteHints:       routeHints,
 		AddIndex:         invoice.AddIndex,
 		SettleIndex:      invoice.SettleIndex,
-		AmtPaid:          int64(invoice.AmtPaid),
+		AmtPaid:          int64(amtPaid),
 	}, nil
 }
 

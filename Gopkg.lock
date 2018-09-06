@@ -49,7 +49,6 @@
   name = "github.com/aead/siphash"
   packages = ["."]
   revision = "83563a290f60225eb120d724600b9690c3fb536f"
-  version = "v1.0.1"
 
 [[projects]]
   name = "github.com/btcsuite/btcd"
@@ -107,7 +106,7 @@
     "walletdb/bdb",
     "wtxmgr"
   ]
-  revision = "7b84dc25a61634c450d21ec7f47d5e916eb88fdb"
+  revision = "8ae4afc70174bacc745e8dd89fc6db2d817909bd"
 
 [[projects]]
   branch = "master"
@@ -229,7 +228,7 @@
     "headerfs",
     "headerlist"
   ]
-  revision = "166fe699d5964581d24e6bfff0aa329cfb6a8bc9"
+  revision = "cccdda0fbb69281c17de496da88e956c300511e2"
 
 [[projects]]
   name = "github.com/lightningnetwork/lightning-onion"
@@ -314,14 +313,13 @@
   revision = "ae89d30ce0c63142b652837da33d782e2b0a9b25"
 
 [[projects]]
-  branch = "master"
   name = "golang.org/x/sys"
   packages = [
     "cpu",
     "unix",
     "windows"
   ]
-  revision = "d99a578cf41bfccdeaf48b0845c823a4b8b0ad5e"
+  revision = "ebe1bf3edb3325c393447059974de898d5133eb8"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -389,7 +387,6 @@
   name = "gopkg.in/errgo.v1"
   packages = ["."]
   revision = "b20caedf0710d0988e92b5f2d76843ad1f231f2d"
-  version = "v1.0.0"
 
 [[projects]]
   name = "gopkg.in/macaroon-bakery.v2"
@@ -408,6 +405,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "19c9f40a7f200ee3408f9c0a1b5c748cd29909c7398168a5c1a77f8c4ca881ac"
+  inputs-digest = "183c33788574bc1118f768904b8b91d7a4191020faec28114774c2f40db57ea8"
   solver-name = "gps-cdcl"
   solver-version = 1
