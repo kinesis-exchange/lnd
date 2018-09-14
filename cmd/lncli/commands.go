@@ -1333,7 +1333,7 @@ var unlockCommand = cli.Command{
 	The unlock command is used to decrypt lnd's wallet state in order to
 	start up. This command MUST be run after booting up lnd before it's
 	able to carry out its duties. An exception is if a user is running with
-	--noencryptwallet, then a default passphrase will be used.
+	--noseedbackup, then a default passphrase will be used.
 	`,
 	Flags: []cli.Flag{
 		cli.IntFlag{
@@ -1401,8 +1401,8 @@ var changePasswordCommand = cli.Command{
 	is successful.
 
 	If one did not specify a password for their wallet (running lnd with
-	--noencryptwallet), one must restart their daemon without
-	--noencryptwallet and use this command. The "current password" field
+	--noseedbackup), one must restart their daemon without
+	--noseedbackup and use this command. The "current password" field
 	should be left empty.
 	`,
 	Action: actionDecorator(changePassword),
@@ -1741,7 +1741,7 @@ func retrieveFeeLimit(ctx *cli.Context) (*lnrpc.FeeLimit, error) {
 	return nil, nil
 }
 
-func confirmPayReq(client lnrpc.LightningClient, payReq string) error {
+func confirmPayReq(ctx *cli.Context, client lnrpc.LightningClient, payReq string) error {
 	ctxb := context.Background()
 
 	req := &lnrpc.PayReqString{PayReq: payReq}
@@ -1750,8 +1750,19 @@ func confirmPayReq(client lnrpc.LightningClient, payReq string) error {
 		return err
 	}
 
+	// If the amount was not included in the invoice, then we let
+	// the payee specify the amount of satoshis they wish to send.
+	amt := resp.GetNumSatoshis()
+	if amt == 0 {
+		amt = ctx.Int64("amt")
+		if amt == 0 {
+			return fmt.Errorf("amount must be specified when " +
+				"paying a zero amount invoice")
+		}
+	}
+
 	fmt.Printf("Description: %v\n", resp.GetDescription())
-	fmt.Printf("Amount (in satoshis): %v\n", resp.GetNumSatoshis())
+	fmt.Printf("Amount (in satoshis): %v\n", amt)
 	fmt.Printf("Destination: %v\n", resp.GetDestination())
 
 	confirm := promptForConfirmation("Confirm payment (yes/no): ")
@@ -1783,7 +1794,7 @@ func sendPayment(ctx *cli.Context) error {
 	// details of the payment are encoded within the request.
 	if ctx.IsSet("pay_req") {
 		if !ctx.Bool("force") {
-			err = confirmPayReq(client, ctx.String("pay_req"))
+			err = confirmPayReq(ctx, client, ctx.String("pay_req"))
 			if err != nil {
 				return err
 			}
@@ -1960,7 +1971,7 @@ func payInvoice(ctx *cli.Context) error {
 	}
 
 	if !ctx.Bool("force") {
-		err = confirmPayReq(client, payReq)
+		err = confirmPayReq(ctx, client, payReq)
 		if err != nil {
 			return err
 		}
@@ -1971,7 +1982,6 @@ func payInvoice(ctx *cli.Context) error {
 		Amt:            ctx.Int64("amt"),
 		FeeLimit:       feeLimit,
 	}
-
 	return sendPaymentRequest(client, req)
 }
 
@@ -2309,7 +2319,23 @@ func lookupInvoice(ctx *cli.Context) error {
 var listInvoicesCommand = cli.Command{
 	Name:     "listinvoices",
 	Category: "Payments",
-	Usage:    "List all invoices currently stored.",
+	Usage: "List all invoices currently stored within the database. Any " +
+		"active debug invoices are ingnored.",
+	Description: `
+	This command enables the retrieval of all invoices currently stored
+	within the database. It has full support for paginationed responses,
+	allowing users to query for specific invoices through their add_index.
+	This can be done by using either the first_index_offset or
+	last_index_offset fields included in the response as the index_offset of
+	the next request. The reversed flag is set by default in order to
+	paginate backwards. If you wish to paginate forwards, you must
+	explicitly set the flag to false. If none of the parameters are
+	specified, then the last 100 invoices will be returned.
+
+	For example: if you have 200 invoices, "lncli listinvoices" will return
+	the last 100 created. If you wish to retrieve the previous 100, the
+	first_offset_index of the response can be used as the index_offset of
+	the next listinvoices request.`,
 	Flags: []cli.Flag{
 		cli.BoolFlag{
 			Name: "pending_only",
@@ -2317,12 +2343,21 @@ var listInvoicesCommand = cli.Command{
 				"or only those that are currently unsettled",
 		},
 		cli.Uint64Flag{
-			Name:  "index_offset",
-			Usage: "the number of invoices to skip",
+			Name: "index_offset",
+			Usage: "the index of an invoice that will be used as " +
+				"either the start or end of a query to " +
+				"determine which invoices should be returned " +
+				"in the response",
 		},
 		cli.Uint64Flag{
 			Name:  "max_invoices",
 			Usage: "the max number of invoices to return",
+		},
+		cli.BoolTFlag{
+			Name: "reversed",
+			Usage: "if set, the invoices returned precede the " +
+				"given index_offset, allowing backwards " +
+				"pagination",
 		},
 	},
 	Action: actionDecorator(listInvoices),
@@ -2334,8 +2369,9 @@ func listInvoices(ctx *cli.Context) error {
 
 	req := &lnrpc.ListInvoiceRequest{
 		PendingOnly:    ctx.Bool("pending_only"),
-		IndexOffset:    uint32(ctx.Uint64("index_offset")),
-		NumMaxInvoices: uint32(ctx.Uint64("max_invoices")),
+		IndexOffset:    ctx.Uint64("index_offset"),
+		NumMaxInvoices: ctx.Uint64("max_invoices"),
+		Reversed:       ctx.Bool("reversed"),
 	}
 
 	invoices, err := client.ListInvoices(context.Background(), req)

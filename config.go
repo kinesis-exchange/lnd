@@ -46,7 +46,7 @@ const (
 	defaultPeerPort            = 9735
 	defaultRPCHost             = "localhost"
 	defaultMaxPendingChannels  = 1
-	defaultNoEncryptWallet     = false
+	defaultNoSeedBackup        = false
 	defaultTrickleDelay        = 30 * 1000
 	defaultInactiveChanTimeout = 20 * time.Minute
 	defaultMaxLogFiles         = 3
@@ -57,6 +57,7 @@ const (
 	defaultTorDNSPort              = 53
 	defaultTorControlPort          = 9051
 	defaultTorV2PrivateKeyFilename = "v2_onion_private_key"
+	defaultTorV3PrivateKeyFilename = "v3_onion_private_key"
 
 	defaultBroadcastDelta = 10
 
@@ -86,10 +87,9 @@ var (
 	defaultBitcoindDir  = btcutil.AppDataDir("bitcoin", false)
 	defaultLitecoindDir = btcutil.AppDataDir("litecoin", false)
 
-	defaultTorSOCKS            = net.JoinHostPort("localhost", strconv.Itoa(defaultTorSOCKSPort))
-	defaultTorDNS              = net.JoinHostPort(defaultTorDNSHost, strconv.Itoa(defaultTorDNSPort))
-	defaultTorControl          = net.JoinHostPort("localhost", strconv.Itoa(defaultTorControlPort))
-	defaultTorV2PrivateKeyPath = filepath.Join(defaultLndDir, defaultTorV2PrivateKeyFilename)
+	defaultTorSOCKS   = net.JoinHostPort("localhost", strconv.Itoa(defaultTorSOCKSPort))
+	defaultTorDNS     = net.JoinHostPort(defaultTorDNSHost, strconv.Itoa(defaultTorDNSPort))
+	defaultTorControl = net.JoinHostPort("localhost", strconv.Itoa(defaultTorControlPort))
 )
 
 type chainConfig struct {
@@ -152,14 +152,14 @@ type autoPilotConfig struct {
 }
 
 type torConfig struct {
-	Active           bool   `long:"active" description:"Allow outbound and inbound connections to be routed through Tor"`
-	SOCKS            string `long:"socks" description:"The host:port that Tor's exposed SOCKS5 proxy is listening on"`
-	DNS              string `long:"dns" description:"The DNS server as host:port that Tor will use for SRV queries - NOTE must have TCP resolution enabled"`
-	StreamIsolation  bool   `long:"streamisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
-	Control          string `long:"control" description:"The host:port that Tor is listening on for Tor control connections"`
-	V2               bool   `long:"v2" description:"Automatically set up a v2 onion service to listen for inbound connections"`
-	V2PrivateKeyPath string `long:"v2privatekeypath" description:"The path to the private key of the onion service being created"`
-	V3               bool   `long:"v3" description:"Use a v3 onion service to listen for inbound connections"`
+	Active          bool   `long:"active" description:"Allow outbound and inbound connections to be routed through Tor"`
+	SOCKS           string `long:"socks" description:"The host:port that Tor's exposed SOCKS5 proxy is listening on"`
+	DNS             string `long:"dns" description:"The DNS server as host:port that Tor will use for SRV queries - NOTE must have TCP resolution enabled"`
+	StreamIsolation bool   `long:"streamisolation" description:"Enable Tor stream isolation by randomizing user credentials for each connection."`
+	Control         string `long:"control" description:"The host:port that Tor is listening on for Tor control connections"`
+	V2              bool   `long:"v2" description:"Automatically set up a v2 onion service to listen for inbound connections"`
+	V3              bool   `long:"v3" description:"Automatically set up a v3 onion service to listen for inbound connections"`
+	PrivateKeyPath  string `long:"privatekeypath" description:"The path to the private key of the onion service being created"`
 }
 
 // config defines the configuration options for lnd.
@@ -229,7 +229,7 @@ type config struct {
 
 	NoNetBootstrap bool `long:"nobootstrap" description:"If true, then automatic network bootstrapping will not be attempted."`
 
-	NoEncryptWallet bool `long:"noencryptwallet" description:"If set, wallet will be encrypted using the default passphrase."`
+	NoSeedBackup bool `long:"noseedbackup" description:"If true, NO SEED WILL BE EXPOSED AND THE WALLET WILL BE ENCRYPTED USING THE DEFAULT PASSPHRASE -- EVER. THIS FLAG IS ONLY FOR TESTING AND IS BEING DEPRECATED."`
 
 	TrickleDelay        int           `long:"trickledelay" description:"Time in milliseconds between each release of announcements to the network"`
 	InactiveChanTimeout time.Duration `long:"inactivechantimeout" description:"If a channel has been inactive for the set time, send a ChannelUpdate disabling it."`
@@ -297,7 +297,7 @@ func loadConfig() (*config, error) {
 			RPCHost: defaultRPCHost,
 		},
 		MaxPendingChannels: defaultMaxPendingChannels,
-		NoEncryptWallet:    defaultNoEncryptWallet,
+		NoSeedBackup:       defaultNoSeedBackup,
 		Autopilot: &autoPilotConfig{
 			MaxChannels:    5,
 			Allocation:     0.6,
@@ -310,10 +310,9 @@ func loadConfig() (*config, error) {
 		Color:               defaultColor,
 		MinChanSize:         int64(minChanFundingSize),
 		Tor: &torConfig{
-			SOCKS:            defaultTorSOCKS,
-			DNS:              defaultTorDNS,
-			Control:          defaultTorControl,
-			V2PrivateKeyPath: defaultTorV2PrivateKeyPath,
+			SOCKS:   defaultTorSOCKS,
+			DNS:     defaultTorDNS,
+			Control: defaultTorControl,
 		},
 		net: &tor.ClearNet{},
 	}
@@ -352,6 +351,13 @@ func loadConfig() (*config, error) {
 	var configFileError error
 	cfg := preCfg
 	if err := flags.IniParse(configFilePath, &cfg); err != nil {
+		// If it's a parsing related error, then we'll return
+		// immediately, otherwise we can proceed as possibly the config
+		// file doesn't exist which is OK.
+		if _, ok := err.(*flags.IniError); ok {
+			return nil, err
+		}
+
 		configFileError = err
 	}
 
@@ -369,7 +375,6 @@ func loadConfig() (*config, error) {
 		cfg.TLSCertPath = filepath.Join(lndDir, defaultTLSCertFilename)
 		cfg.TLSKeyPath = filepath.Join(lndDir, defaultTLSKeyFilename)
 		cfg.LogDir = filepath.Join(lndDir, defaultLogDirname)
-		cfg.Tor.V2PrivateKeyPath = filepath.Join(lndDir, defaultTorV2PrivateKeyFilename)
 	}
 
 	// Create the lnd directory if it doesn't already exist.
@@ -405,7 +410,7 @@ func loadConfig() (*config, error) {
 	cfg.LtcdMode.Dir = cleanAndExpandPath(cfg.LtcdMode.Dir)
 	cfg.BitcoindMode.Dir = cleanAndExpandPath(cfg.BitcoindMode.Dir)
 	cfg.LitecoindMode.Dir = cleanAndExpandPath(cfg.LitecoindMode.Dir)
-	cfg.Tor.V2PrivateKeyPath = cleanAndExpandPath(cfg.Tor.V2PrivateKeyPath)
+	cfg.Tor.PrivateKeyPath = cleanAndExpandPath(cfg.Tor.PrivateKeyPath)
 
 	// Ensure that the user didn't attempt to specify negative values for
 	// any of the autopilot params.
@@ -494,6 +499,19 @@ func loadConfig() (*config, error) {
 		// Therefore, we'll disable listening in order to avoid
 		// inadvertent leaks.
 		cfg.DisableListen = true
+	}
+
+	if cfg.Tor.PrivateKeyPath == "" {
+		switch {
+		case cfg.Tor.V2:
+			cfg.Tor.PrivateKeyPath = filepath.Join(
+				lndDir, defaultTorV2PrivateKeyFilename,
+			)
+		case cfg.Tor.V3:
+			cfg.Tor.PrivateKeyPath = filepath.Join(
+				lndDir, defaultTorV3PrivateKeyFilename,
+			)
+		}
 	}
 
 	// Set up the network-related functions that will be used throughout
