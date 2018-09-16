@@ -8,7 +8,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/roasbeef/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // ShortChanIDEncoding is an enum-like type that represents exactly how a set
@@ -112,6 +112,10 @@ func decodeShortChanIDs(r io.Reader) (ShortChanIDEncoding, []ShortChannelID, err
 		return 0, nil, err
 	}
 
+	if numBytesResp == 0 {
+		return 0, nil, fmt.Errorf("No encoding type specified")
+	}
+
 	queryBody := make([]byte, numBytesResp)
 	if _, err := io.ReadFull(r, queryBody); err != nil {
 		return 0, nil, err
@@ -146,10 +150,13 @@ func decodeShortChanIDs(r io.Reader) (ShortChanIDEncoding, []ShortChannelID, err
 		// compute the number of bytes encoded based on the size of the
 		// query body.
 		numShortChanIDs := len(queryBody) / 8
-		shortChanIDs := make([]ShortChannelID, numShortChanIDs)
+		if numShortChanIDs == 0 {
+			return encodingType, nil, nil
+		}
 
 		// Finally, we'll read out the exact number of short channel
 		// ID's to conclude our parsing.
+		shortChanIDs := make([]ShortChannelID, numShortChanIDs)
 		bodyReader := bytes.NewReader(queryBody)
 		for i := 0; i < numShortChanIDs; i++ {
 			if err := readElements(bodyReader, &shortChanIDs[i]); err != nil {

@@ -14,12 +14,12 @@ import (
 	"testing/quick"
 	"time"
 
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcutil"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/tor"
-	"github.com/roasbeef/btcd/btcec"
-	"github.com/roasbeef/btcd/chaincfg/chainhash"
-	"github.com/roasbeef/btcd/wire"
-	"github.com/roasbeef/btcutil"
 )
 
 var (
@@ -537,6 +537,17 @@ func TestLightningWireProtocol(t *testing.T) {
 				return
 			}
 
+			numExtraBytes := r.Int31n(1000)
+			if numExtraBytes > 0 {
+				req.ExtraOpaqueData = make([]byte, numExtraBytes)
+				_, err := r.Read(req.ExtraOpaqueData[:])
+				if err != nil {
+					t.Fatalf("unable to generate opaque "+
+						"bytes: %v", err)
+					return
+				}
+			}
+
 			v[0] = reflect.ValueOf(req)
 		},
 		MsgNodeAnnouncement: func(v []reflect.Value, r *rand.Rand) {
@@ -574,6 +585,17 @@ func TestLightningWireProtocol(t *testing.T) {
 				t.Fatalf("unable to generate addresses: %v", err)
 			}
 
+			numExtraBytes := r.Int31n(1000)
+			if numExtraBytes > 0 {
+				req.ExtraOpaqueData = make([]byte, numExtraBytes)
+				_, err := r.Read(req.ExtraOpaqueData[:])
+				if err != nil {
+					t.Fatalf("unable to generate opaque "+
+						"bytes: %v", err)
+					return
+				}
+			}
+
 			v[0] = reflect.ValueOf(req)
 		},
 		MsgChannelUpdate: func(v []reflect.Value, r *rand.Rand) {
@@ -596,6 +618,17 @@ func TestLightningWireProtocol(t *testing.T) {
 			if _, err := r.Read(req.ChainHash[:]); err != nil {
 				t.Fatalf("unable to generate chain hash: %v", err)
 				return
+			}
+
+			numExtraBytes := r.Int31n(1000)
+			if numExtraBytes > 0 {
+				req.ExtraOpaqueData = make([]byte, numExtraBytes)
+				_, err := r.Read(req.ExtraOpaqueData[:])
+				if err != nil {
+					t.Fatalf("unable to generate opaque "+
+						"bytes: %v", err)
+					return
+				}
 			}
 
 			v[0] = reflect.ValueOf(req)
@@ -621,6 +654,17 @@ func TestLightningWireProtocol(t *testing.T) {
 			if _, err := r.Read(req.ChannelID[:]); err != nil {
 				t.Fatalf("unable to generate chan id: %v", err)
 				return
+			}
+
+			numExtraBytes := r.Int31n(1000)
+			if numExtraBytes > 0 {
+				req.ExtraOpaqueData = make([]byte, numExtraBytes)
+				_, err := r.Read(req.ExtraOpaqueData[:])
+				if err != nil {
+					t.Fatalf("unable to generate opaque "+
+						"bytes: %v", err)
+					return
+				}
 			}
 
 			v[0] = reflect.ValueOf(req)
@@ -667,12 +711,9 @@ func TestLightningWireProtocol(t *testing.T) {
 			}
 
 			numChanIDs := rand.Int31n(5000)
-
-			req.ShortChanIDs = make([]ShortChannelID, numChanIDs)
 			for i := int32(0); i < numChanIDs; i++ {
-				req.ShortChanIDs[i] = NewShortChanIDFromInt(
-					uint64(r.Int63()),
-				)
+				req.ShortChanIDs = append(req.ShortChanIDs,
+					NewShortChanIDFromInt(uint64(r.Int63())))
 			}
 
 			v[0] = reflect.ValueOf(req)
@@ -701,12 +742,9 @@ func TestLightningWireProtocol(t *testing.T) {
 			}
 
 			numChanIDs := rand.Int31n(5000)
-
-			req.ShortChanIDs = make([]ShortChannelID, numChanIDs)
 			for i := int32(0); i < numChanIDs; i++ {
-				req.ShortChanIDs[i] = NewShortChanIDFromInt(
-					uint64(r.Int63()),
-				)
+				req.ShortChanIDs = append(req.ShortChanIDs,
+					NewShortChanIDFromInt(uint64(r.Int63())))
 			}
 
 			v[0] = reflect.ValueOf(req)
