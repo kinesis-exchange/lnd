@@ -2875,7 +2875,7 @@ func testSphinxReplayPersistence(net *lntest.NetworkHarness, t *harnessTest) {
 	// expects a payment of 1000 satoshis from Carol paid via a particular
 	// preimage.
 	const paymentAmt = 1000
-	preimage := bytes.Repeat([]byte("A"), 32)
+	preimage := bytes.Repeat([]byte("C"), 32)
 	invoice := &lnrpc.Invoice{
 		Memo:      "testing",
 		RPreimage: preimage,
@@ -3119,7 +3119,7 @@ func testExternalPreimageInvoice(net *lntest.NetworkHarness, t *harnessTest) {
 	// create an invoice for Bob which expects a payment of 1000 satoshis
 	// from Alice paid via an external preimage
 	const paymentAmt = 1000
-	preimage := bytes.Repeat([]byte("B"), 32)
+	preimage := bytes.Repeat([]byte("C"), 32)
 	hash := sha256.Sum256(preimage)
 	invoice := &lnrpc.Invoice{
 		Memo:             "testing",
