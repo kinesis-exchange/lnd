@@ -581,7 +581,7 @@ func loadConfig() (*config, error) {
 		// support regtest on ltc
 		if cfg.Litecoin.RegTest {
 			numNets++
-			activeNetParams = litecoinRegTestNetParams
+			ltcParams = litecoinRegTestNetParams
 		}
 		// NOTE(dannypaz): Current lightning-labs/lnd code does not
 		// support simnet on ltc
