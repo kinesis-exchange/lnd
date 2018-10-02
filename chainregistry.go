@@ -30,6 +30,7 @@ import (
 	"github.com/lightningnetwork/lnd/lnwallet/btcwallet"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/routing/chainview"
+	ltcChain "github.com/ltcsuite/ltcwallet/chain"
 )
 
 const (
@@ -314,16 +315,33 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			}
 		}
 
-		// Establish the connection to bitcoind and create the clients
-		// required for our relevant subsystems.
-		bitcoindConn, err := chain.NewBitcoindConn(
-			activeNetParams.Params, bitcoindHost,
-			bitcoindMode.RPCUser, bitcoindMode.RPCPass,
-			bitcoindMode.ZMQPubRawBlock, bitcoindMode.ZMQPubRawTx,
-			100*time.Millisecond,
-		)
-		if err != nil {
-			return nil, nil, err
+		// We add a check for bitcoind/litecoind here because the server can
+		// fail to start if we do not create the correct connection (either btcwallet or ltcwallet)
+		if homeChainConfig.node == "bitcoind" {
+			// Establish the connection to bitcoind and create the clients
+			// required for our relevant subsystems.
+			bitcoindConn, err := chain.NewBitcoindConn(
+				activeNetParams.Params, bitcoindHost,
+				bitcoindMode.RPCUser, bitcoindMode.RPCPass,
+				bitcoindMode.ZMQPubRawBlock, bitcoindMode.ZMQPubRawTx,
+				100*time.Millisecond,
+			)
+			if err != nil {
+				return nil, nil, err
+			}
+		} else {
+			// Establish the connection to litecoind and create the clients
+			// required for our relevant subsystems.
+			bitcoindConn, err := ltcChain.NewBitcoindConn(
+				activeNetParams.Params, bitcoindHost,
+				bitcoindMode.RPCUser, bitcoindMode.RPCPass,
+				bitcoindMode.ZMQPubRawBlock, bitcoindMode.ZMQPubRawTx,
+				100*time.Millisecond,
+			)
+
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 
 		if err := bitcoindConn.Start(); err != nil {
