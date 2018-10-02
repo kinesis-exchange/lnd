@@ -82,6 +82,17 @@ var litecoinSimNetParams = litecoinNetParams{
 	CoinType: keychain.CoinTypeTestnet,
 }
 
+// litecoinRegNetParams contains parameters specific to the simulation test
+// network.
+//
+// NOTE(dannypaz): Current lightning-labs/lnd code does not support
+// regtest on ltc, however litecoind/ltcd has param information for this setup
+var litecoinRegTestNetParams = litecoinNetParams{
+	Params:   &litecoinCfg.RegressionNetParams,
+	rpcPort:  "19334",
+	CoinType: keychain.CoinTypeTestnet,
+}
+
 // regTestNetParams contains parameters specific to a local regtest network.
 var regTestNetParams = bitcoinNetParams{
 	Params:   &bitcoinCfg.RegressionNetParams,
