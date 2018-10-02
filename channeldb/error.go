@@ -7,6 +7,10 @@ var (
 	// created.
 	ErrNoChanDBExists = fmt.Errorf("channel db has not yet been created")
 
+	// ErrDBReversion is returned when detecting an attempt to revert to a
+	// prior database version.
+	ErrDBReversion = fmt.Errorf("channel db cannot revert to prior version")
+
 	// ErrLinkNodesNotFound is returned when node info bucket hasn't been
 	// created.
 	ErrLinkNodesNotFound = fmt.Errorf("no link nodes exist")
@@ -90,3 +94,13 @@ var (
 	// to the log not having any recorded events.
 	ErrNoForwardingEvents = fmt.Errorf("no recorded forwarding events")
 )
+
+// ErrTooManyExtraOpaqueBytes creates an error which should be returned if the
+// caller attempts to write an announcement message which bares too many extra
+// opaque bytes. We limit this value in order to ensure that we don't waste
+// disk space due to nodes unnecessarily padding out their announcements with
+// garbage data.
+func ErrTooManyExtraOpaqueBytes(numBytes int) error {
+	return fmt.Errorf("max allowed number of opaque bytes is %v, received "+
+		"%v bytes", MaxAllowedExtraOpaqueBytes, numBytes)
+}
