@@ -316,6 +316,8 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 
 		// Establish the connection to bitcoind and create the clients
 		// required for our relevant subsystems.
+		fmt.Printf("%v", activeNetParams.Params)
+
 		bitcoindConn, err := chain.NewBitcoindConn(
 			activeNetParams.Params, bitcoindHost,
 			bitcoindMode.RPCUser, bitcoindMode.RPCPass,
