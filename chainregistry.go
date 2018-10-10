@@ -314,11 +314,14 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			}
 		}
 
+		// We set the genesis hash for litecoin regtest to be equal to the bitcoin regtest
+		// genesis hash in this situation (dannypaz)
+		if homeChainConfig.Node == "litecoin" {
+			activeNetParams.Params.GenesisHash = regTestNetParams.Params.GenesisHash
+		}
+
 		// Establish the connection to bitcoind and create the clients
 		// required for our relevant subsystems.
-		fmt.Printf("Here we go!")
-		fmt.Printf("%v", activeNetParams.Params.GenesisHash)
-
 		bitcoindConn, err := chain.NewBitcoindConn(
 			activeNetParams.Params, bitcoindHost,
 			bitcoindMode.RPCUser, bitcoindMode.RPCPass,
