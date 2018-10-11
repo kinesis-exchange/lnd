@@ -314,14 +314,15 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			}
 		}
 
-		// We set the genesis hash for litecoin regtest to be equal to the bitcoin regtest
-		// genesis hash in this situation (dannypaz)
+		// Establish the connection to bitcoind and create the clients
+		// required for our relevant subsystems.
 		if homeChainConfig.Node == "litecoin" {
 			activeNetParams.Params.GenesisHash = regTestNetParams.Params.GenesisHash
 		}
 
-		// Establish the connection to bitcoind and create the clients
-		// required for our relevant subsystems.
+		fmt.Printf("HEY HERE WE ARE \n")
+		fmt.Printf("%v", activeNetParams.Params.GenesisHash)
+
 		bitcoindConn, err := chain.NewBitcoindConn(
 			activeNetParams.Params, bitcoindHost,
 			bitcoindMode.RPCUser, bitcoindMode.RPCPass,
@@ -371,7 +372,7 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			if err := cc.feeEstimator.Start(); err != nil {
 				return nil, nil, err
 			}
-		} else if cfg.Litecoin.Active {
+		} else if cfg.Litecoin.Active && !cfg.Litecoin.RegTest {
 			ltndLog.Infof("Initializing litecoind backed fee estimator")
 
 			// Finally, we'll re-initialize the fee estimator, as
