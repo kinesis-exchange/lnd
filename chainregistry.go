@@ -318,10 +318,8 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 		// required for our relevant subsystems.
 		if homeChainConfig.Node == "litecoin" {
 			activeNetParams.Params.GenesisHash = regTestNetParams.Params.GenesisHash
+			activeNetParams.Params.GenesisBlock = regTestNetParams.Params.GenesisBlock
 		}
-
-		fmt.Printf("HEY HERE WE ARE \n")
-		fmt.Printf("%v", activeNetParams.Params.GenesisHash)
 
 		bitcoindConn, err := chain.NewBitcoindConn(
 			activeNetParams.Params, bitcoindHost,
