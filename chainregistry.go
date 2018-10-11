@@ -322,6 +322,10 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			fmt.Printf("%v\n", bitcoinTestNetParams.Params.GenesisHash)
 			fmt.Printf("%v\n", regTestNetParams.Params.GenesisHash)
 			fmt.Printf("%v\n", bitcoinSimNetParams.Params.GenesisHash)
+			fmt.Printf("Going back to litecoin")
+			fmt.Printf("%v\n", litecoinMainNetParams.Params.GenesisHash)
+			fmt.Printf("%v\n", litecoinTestNetParams.Params.GenesisHash)
+			fmt.Printf("%v\n", litecoinRegTestNetParams.Params.GenesisHash)
 			activeNetParams.Params.GenesisHash = regTestNetParams.Params.GenesisHash
 			activeNetParams.Params.GenesisBlock = regTestNetParams.Params.GenesisBlock
 		}
