@@ -548,14 +548,15 @@ func loadConfig() (*config, error) {
 
 	case cfg.Litecoin.Active:
 		// NOTE(dannypaz): Current lightning-labs/lnd code does not
-		// support siment on ltc
+		// support simnet on ltc
 		if cfg.Litecoin.SimNet {
 			fmt.Printf("%s: Connecting to experimental litecoin simnet\n", funcName)
 		}
 
+		// NOTE(dannypaz): Current lightning-labs/lnd code does not
+		// support regtest on ltc
 		if cfg.Litecoin.RegTest {
-			str := "%s: regnet mode for litecoin not currently supported"
-			return nil, fmt.Errorf(str, funcName)
+			fmt.Printf("%s: Connecting to experimental litecoin regtest\n", funcName)
 		}
 
 		if cfg.Litecoin.TimeLockDelta < minTimeLockDelta {
@@ -577,7 +578,13 @@ func loadConfig() (*config, error) {
 			ltcParams = litecoinTestNetParams
 		}
 		// NOTE(dannypaz): Current lightning-labs/lnd code does not
-		// support siment on ltc
+		// support regtest on ltc
+		if cfg.Litecoin.RegTest {
+			numNets++
+			ltcParams = litecoinRegTestNetParams
+		}
+		// NOTE(dannypaz): Current lightning-labs/lnd code does not
+		// support simnet on ltc
 		if cfg.Litecoin.SimNet {
 			numNets++
 			ltcParams = litecoinSimNetParams
