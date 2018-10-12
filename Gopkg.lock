@@ -265,6 +265,12 @@
   revision = "6724a57986aff9bff1a1770e9347036def7c89f6"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/sparkswap/ltcd"
+  packages = ["chaincfg"]
+  revision = "cddc68f450d92182f889229eeb950d3071c601d1"
+
+[[projects]]
   name = "github.com/tv42/zbase32"
   packages = ["."]
   revision = "501572607d0273fc75b3b261fa4904d63f6ffa0e"
@@ -410,6 +416,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b43fe49565e8715fc718ea0ef3535ae2dcc2016c48c84d4a43d9ce4368e07cf9"
+  inputs-digest = "5c054f0c535e28d5091b1e326258468ace958f3ab5091eea18d4b56219b79dad"
   solver-name = "gps-cdcl"
   solver-version = 1
