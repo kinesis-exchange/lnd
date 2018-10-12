@@ -316,19 +316,8 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 
 		// Establish the connection to bitcoind and create the clients
 		// required for our relevant subsystems.
-		if homeChainConfig.Node == "litecoind" {
-			fmt.Printf("What in the.....")
-			fmt.Printf("%v\n", bitcoinMainNetParams.Params.GenesisHash)
-			fmt.Printf("%v\n", bitcoinTestNetParams.Params.GenesisHash)
-			fmt.Printf("%v\n", regTestNetParams.Params.GenesisHash)
-			fmt.Printf("%v\n", bitcoinSimNetParams.Params.GenesisHash)
-			fmt.Printf("Going back to litecoin")
-			fmt.Printf("%v\n", litecoinMainNetParams.Params.GenesisHash)
-			fmt.Printf("%v\n", litecoinTestNetParams.Params.GenesisHash)
-			fmt.Printf("%v\n", litecoinRegTestNetParams.Params.GenesisHash)
-			activeNetParams.Params.GenesisHash = regTestNetParams.Params.GenesisHash
-			activeNetParams.Params.GenesisBlock = regTestNetParams.Params.GenesisBlock
-		}
+		// if homeChainConfig.Node == "litecoind" {
+		// }
 
 		bitcoindConn, err := chain.NewBitcoindConn(
 			activeNetParams.Params, bitcoindHost,
