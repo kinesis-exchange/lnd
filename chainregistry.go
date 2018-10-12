@@ -365,7 +365,7 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			if err := cc.feeEstimator.Start(); err != nil {
 				return nil, nil, err
 			}
-		} else if cfg.Litecoin.Active {
+		} else if cfg.Litecoin.Active && !cfg.Litecoin.RegTest {
 			ltndLog.Infof("Initializing litecoind backed fee estimator")
 
 			// Finally, we'll re-initialize the fee estimator, as
