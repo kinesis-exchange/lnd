@@ -6,8 +6,8 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	bitcoinWire "github.com/btcsuite/btcd/wire"
 	"github.com/lightningnetwork/lnd/keychain"
-	litecoinCfg "github.com/ltcsuite/ltcd/chaincfg"
 	litecoinWire "github.com/ltcsuite/ltcd/wire"
+	litecoinCfg "github.com/sparkswap/ltcd/chaincfg"
 )
 
 // activeNetParams is a pointer to the parameters specific to the currently
