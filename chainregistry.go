@@ -316,9 +316,6 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 
 		// Establish the connection to bitcoind and create the clients
 		// required for our relevant subsystems.
-		// if homeChainConfig.Node == "litecoind" {
-		// }
-
 		bitcoindConn, err := chain.NewBitcoindConn(
 			activeNetParams.Params, bitcoindHost,
 			bitcoindMode.RPCUser, bitcoindMode.RPCPass,
