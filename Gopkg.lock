@@ -242,7 +242,7 @@
     "chaincfg/chainhash",
     "wire"
   ]
-  revision = "cdab10132e8c6e4a3ffd112dba54791946d28906"
+  revision = "01737289d815e0e32c91e55593ba2fbd8d090b2c"
 
 [[projects]]
   name = "github.com/miekg/dns"
@@ -410,6 +410,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "b43fe49565e8715fc718ea0ef3535ae2dcc2016c48c84d4a43d9ce4368e07cf9"
+  inputs-digest = "792b929b6cd715676355052f521eec52f01c2eb40eb7ca08e0cce1867d2750ef"
   solver-name = "gps-cdcl"
   solver-version = 1
