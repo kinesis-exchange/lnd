@@ -43,7 +43,8 @@ func DefaultRPC() RPC {
 
 // Client is the exposed interface for an extpreimage Client
 type Client interface {
-	connect(context.Context) (ExternalPreimageServiceClient, error)
+	connect(context.Context) (ExternalPreimageServiceClient, *grpcpool.ClientConn,
+		error)
 	Retrieve(*PreimageRequest) ([32]byte, error, error)
 	Stop()
 }
@@ -61,12 +62,12 @@ type client struct {
 
 // connect creates a new ExternalPreimageServiceClient from the connection pool
 func (c *client) connect(ctx context.Context) (ExternalPreimageServiceClient,
-	error) {
+	*grpcpool.ClientConn, error) {
 	conn, err := c.pool.Get(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return c.rpc.NewClient(conn), nil
+	return c.rpc.NewClient(conn), conn, nil
 }
 
 // Retrieve is a wrapper around the underlying GetPreimage defined
@@ -81,10 +82,13 @@ func (c *client) retrieve(req *GetPreimageRequest) (*GetPreimageResponse,
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	client, err := c.connect(ctx)
+	client, conn, err := c.connect(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	// return the connection to the pool after function has returned
+	defer conn.Close()
 
 	// make the request to the server to open the stream
 	stream, err := client.GetPreimage(ctx, req)
