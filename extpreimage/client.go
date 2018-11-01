@@ -87,14 +87,14 @@ func (c *client) retrieve(req *GetPreimageRequest) (*GetPreimageResponse,
 		return nil, err
 	}
 
-	// return the connection to the pool after function has returned
-	defer conn.Close()
-
 	// make the request to the server to open the stream
 	stream, err := client.GetPreimage(ctx, req)
 	if err != nil {
 		return nil, err
 	}
+
+	// return the connection to the pool after the preimage has been returned
+	defer conn.Close()
 
 	for {
 		// receive the next message from the stream
