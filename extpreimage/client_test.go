@@ -1,6 +1,7 @@
 package extpreimage_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -69,9 +70,11 @@ func (r *mockRpc) NewClient(c *grpc.ClientConn) extpreimage.ExternalPreimageServ
 
 	client := NewMockExternalPreimageServiceClient(r.ctrl)
 
+	ctx, _ := context.WithCancel(context.Background())
+
 	// Set expectation on GetPreimage
 	client.EXPECT().GetPreimage(
-		gomock.Any(),
+		gomock.Eq(ctx),
 		expect,
 	).Return(r.stream, nil)
 
