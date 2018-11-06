@@ -9,7 +9,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/golang/protobuf/proto"
 	"github.com/lightningnetwork/lnd/extpreimage"
-	grpcpool "github.com/processout/grpc-go-pool"
 	"google.golang.org/grpc"
 )
 
@@ -59,7 +58,7 @@ func (r *mockRpc) WithInsecure() grpc.DialOption {
 
 // NewClient returns our mock client from gomock/mockgen
 // and returns the created stream to any calls to GetPreimage
-func (r *mockRpc) NewClient(c *grpcpool.ClientConn) extpreimage.ExternalPreimageServiceClient {
+func (r *mockRpc) NewClient(c *grpc.ClientConn) extpreimage.ExternalPreimageServiceClient {
 	var expect gomock.Matcher
 
 	if r.expect != nil {
@@ -111,6 +110,10 @@ func TestRetrieveConnects(t *testing.T) {
 		PaymentPreimage: preimage[:],
 	}
 	c, rpc := newMock(t, host, chain)
+
+	if rpc.connOpen == true {
+		t.Fatalf("Expected conn not to be open, got %v", rpc.connOpen)
+	}
 
 	// Set expectation on receiving.
 	rpc.stream.EXPECT().Recv().Return(msg, nil)
