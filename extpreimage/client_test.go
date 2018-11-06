@@ -1,6 +1,7 @@
 package extpreimage_test
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -9,7 +10,6 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/golang/protobuf/proto"
 	"github.com/lightningnetwork/lnd/extpreimage"
-	grpcpool "github.com/processout/grpc-go-pool"
 	"google.golang.org/grpc"
 )
 
@@ -59,7 +59,7 @@ func (r *mockRpc) WithInsecure() grpc.DialOption {
 
 // NewClient returns our mock client from gomock/mockgen
 // and returns the created stream to any calls to GetPreimage
-func (r *mockRpc) NewClient(c *grpcpool.ClientConn) extpreimage.ExternalPreimageServiceClient {
+func (r *mockRpc) NewClient(c *grpc.ClientConn) extpreimage.ExternalPreimageServiceClient {
 	var expect gomock.Matcher
 
 	if r.expect != nil {
@@ -70,9 +70,11 @@ func (r *mockRpc) NewClient(c *grpcpool.ClientConn) extpreimage.ExternalPreimage
 
 	client := NewMockExternalPreimageServiceClient(r.ctrl)
 
+	ctx, _ := context.WithCancel(context.Background())
+
 	// Set expectation on GetPreimage
 	client.EXPECT().GetPreimage(
-		gomock.Any(),
+		gomock.Eq(ctx),
 		expect,
 	).Return(r.stream, nil)
 
@@ -111,6 +113,10 @@ func TestRetrieveConnects(t *testing.T) {
 		PaymentPreimage: preimage[:],
 	}
 	c, rpc := newMock(t, host, chain)
+
+	if rpc.connOpen == true {
+		t.Fatalf("Expected conn not to be open, got %v", rpc.connOpen)
+	}
 
 	// Set expectation on receiving.
 	rpc.stream.EXPECT().Recv().Return(msg, nil)
@@ -357,7 +363,7 @@ func TestRetrievePermanentErrorsOnPermanentFailure(t *testing.T) {
 	err := "fake error"
 	preimage := makePreimage("fake preimage")
 	hash := sha256.Sum256(preimage[:])
-	expectedErr := "extpreimage: Encountered permanent error from external "+
+	expectedErr := "extpreimage: Encountered permanent error from external " +
 		"service: " + err
 	msg := &extpreimage.GetPreimageResponse{
 		PermanentError: err,

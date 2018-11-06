@@ -500,7 +500,7 @@ func TestChannelLinkMultiHopPayment(t *testing.T) {
 // extpreimage.Client interface for testing retrieval of preimages
 type mockExtpreimageClient struct {
 	extpreimage.Client
-	preimage [32]byte
+	preimage  [32]byte
 	permError error
 }
 
@@ -688,7 +688,6 @@ func TestExitNodeExternalPreimagePermanentFail(t *testing.T) {
 			"instead have: %v", err)
 	}
 }
-
 
 // TestExitNodeTimelockPayloadMismatch tests that when an exit node receives an
 // incoming HTLC, if the time lock encoded in the payload of the forwarded HTLC
