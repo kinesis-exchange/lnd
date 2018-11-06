@@ -253,12 +253,6 @@
   revision = "79bfde677fa81ff8d27c4330c35bda075d360641"
 
 [[projects]]
-  name = "github.com/processout/grpc-go-pool"
-  packages = ["."]
-  revision = "dd880f820cb22b1abcb14d6f98c3812ac05b3758"
-  version = "v1.2.1"
-
-[[projects]]
   branch = "master"
   name = "github.com/rogpeppe/fastuuid"
   packages = ["."]
@@ -410,6 +404,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "792b929b6cd715676355052f521eec52f01c2eb40eb7ca08e0cce1867d2750ef"
+  inputs-digest = "e51c8746f7789d36b892509af8e0a4b7cbfdeb3df1493168bee90c142cba0f2b"
   solver-name = "gps-cdcl"
   solver-version = 1
