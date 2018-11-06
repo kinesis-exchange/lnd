@@ -12,9 +12,9 @@ import (
 
 // RPC is an interface implemented by the grpc package
 type RPC interface {
-  Dial(host string, opt grpc.DialOption) (*grpc.ClientConn, error)
-  WithInsecure() grpc.DialOption
-  NewClient(*grpc.ClientConn) ExternalPreimageServiceClient
+	Dial(host string, opt grpc.DialOption) (*grpc.ClientConn, error)
+	WithInsecure() grpc.DialOption
+	NewClient(*grpc.ClientConn) ExternalPreimageServiceClient
 }
 
 // grpcRpc exposes the methods from the grpc package that we need
@@ -22,21 +22,21 @@ type RPC interface {
 type grpcRpc struct{}
 
 func (r *grpcRpc) Dial(host string, opt grpc.DialOption) (*grpc.ClientConn,
-  error) {
-  return grpc.Dial(host, opt)
+	error) {
+	return grpc.Dial(host, opt)
 }
 
 func (r *grpcRpc) WithInsecure() grpc.DialOption {
-  return grpc.WithInsecure()
+	return grpc.WithInsecure()
 }
 
 func (r *grpcRpc) NewClient(c *grpc.ClientConn) ExternalPreimageServiceClient {
-  return NewExternalPreimageServiceClient(c)
+	return NewExternalPreimageServiceClient(c)
 }
 
 // DefaultRPC exposes the default gRPC implementation for consumers
 func DefaultRPC() RPC {
-  return &grpcRpc{}
+	return &grpcRpc{}
 }
 
 // Client is the exposed interface for an extpreimage Client
@@ -49,10 +49,10 @@ type Client interface {
 // client is a representation of a client of the external preimage
 // service that implements the Client interface
 type client struct {
-	host   string
-	chain  string
-	rpc    RPC
-	conn   *grpc.ClientConn
+	host  string
+	chain string
+	rpc   RPC
+	conn  *grpc.ClientConn
 }
 
 // connect creates a new ExternalPreimageServiceClient from an existing
@@ -61,19 +61,19 @@ func (c *client) connect() (ExternalPreimageServiceClient,
 	error) {
 	if c.conn == nil {
 		conn, err := c.rpc.Dial(c.host, c.rpc.WithInsecure())
-	  if err != nil {
-	    return nil, fmt.Errorf("extpreimage: Failed to start gRPC "+
-	    	"connection: %v", err)
-	  }
-	  fmt.Printf("extpreimage: Connected to External Preimage Service at %s\n",
-	    c.host)
-	  c.conn = conn
+		if err != nil {
+			return nil, fmt.Errorf("extpreimage: Failed to start gRPC "+
+				"connection: %v", err)
+		}
+		fmt.Printf("extpreimage: Connected to External Preimage Service at %s\n",
+			c.host)
+		c.conn = conn
 	} else {
 		fmt.Printf("extpreimage: Re-using connection for %s\n",
-	    c.host)
+			c.host)
 	}
 
-  return c.rpc.NewClient(c.conn), nil
+	return c.rpc.NewClient(c.conn), nil
 }
 
 // Retrieve is a wrapper around the underlying GetPreimage defined

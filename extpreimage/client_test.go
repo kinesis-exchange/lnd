@@ -363,7 +363,7 @@ func TestRetrievePermanentErrorsOnPermanentFailure(t *testing.T) {
 	err := "fake error"
 	preimage := makePreimage("fake preimage")
 	hash := sha256.Sum256(preimage[:])
-	expectedErr := "extpreimage: Encountered permanent error from external "+
+	expectedErr := "extpreimage: Encountered permanent error from external " +
 		"service: " + err
 	msg := &extpreimage.GetPreimageResponse{
 		PermanentError: err,
