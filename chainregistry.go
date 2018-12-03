@@ -181,8 +181,8 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 		cleanUp func()
 	)
 
-	// Initialize disabled height hint cache within the chain directory.
-	hintCache, err := chainntnfs.NewHeightHintCache(chanDB, true)
+	// Initialize the height hint cache within the chain directory.
+	hintCache, err := chainntnfs.NewHeightHintCache(chanDB)
 	if err != nil {
 		return nil, nil, fmt.Errorf("unable to initialize height hint "+
 			"cache: %v", err)
@@ -365,7 +365,7 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			if err := cc.feeEstimator.Start(); err != nil {
 				return nil, nil, err
 			}
-		} else if cfg.Litecoin.Active && !cfg.Litecoin.RegTest {
+		} else if cfg.Litecoin.Active {
 			ltndLog.Infof("Initializing litecoind backed fee estimator")
 
 			// Finally, we'll re-initialize the fee estimator, as

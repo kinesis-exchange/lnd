@@ -44,11 +44,15 @@
 
 [[constraint]]
   name = "github.com/lightninglabs/neutrino"
-  revision = "bee0ed11601a4ad0c3b23d462cd71089fc11f2cd"
+  revision = "9a42f7df21be82a69f04caa83bce4034dca72764"
 
 [[constraint]]
   name = "github.com/lightningnetwork/lightning-onion"
   revision = "ac4d9da8f1d67c95f1fafdc65e1a4902d6f5a940"
+
+[[constraint]]
+  name = "github.com/ltcsuite/ltcd"
+  revision = "cdab10132e8c6e4a3ffd112dba54791946d28906"
 
 [[constraint]]
   name = "github.com/miekg/dns"
@@ -68,7 +72,7 @@
 
 [[constraint]]
   name = "github.com/btcsuite/btcwallet"
-  revision = "421298df22601db0fe4adb8f4be71b7014324ba9"
+  revision = "7ad4f1e81d7831b5b4bc8597fe9db731fbb3be22"
 
 [[constraint]]
   name = "github.com/tv42/zbase32"
@@ -104,7 +108,7 @@
 
 [[constraint]]
   name = "google.golang.org/grpc"
-  revision = "b3ddf786825de56a4178401b7e174ee332173b66"
+  revision = "8dea3dc473e90c8179e519d91302d0597c0ca1d1"
 
 [[override]]
   name = "gopkg.in/errgo.v1"
@@ -121,7 +125,3 @@
 [prune]
   go-tests = true
   unused-packages = true
-
-[[constraint]]
-  name = "github.com/ltcsuite/ltcd"
-  revision = "01737289d815e0e32c91e55593ba2fbd8d090b2c"

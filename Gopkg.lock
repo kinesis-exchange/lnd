@@ -16,7 +16,7 @@
   branch = "master"
   name = "github.com/NebulousLabs/fastrand"
   packages = ["."]
-  revision = "3cf7173006a0b7d2371fa1a220da7f9d48c7827c"
+  revision = "6fb6489aac4eae79e3f8112c21708191a7a90dd7"
 
 [[projects]]
   name = "github.com/NebulousLabs/go-upnp"
@@ -104,9 +104,10 @@
     "wallet/txrules",
     "walletdb",
     "walletdb/bdb",
+    "walletdb/migration",
     "wtxmgr"
   ]
-  revision = "421298df22601db0fe4adb8f4be71b7014324ba9"
+  revision = "7ad4f1e81d7831b5b4bc8597fe9db731fbb3be22"
 
 [[projects]]
   branch = "master"
@@ -166,8 +167,11 @@
     "jsonpb",
     "proto",
     "protoc-gen-go/descriptor",
+    "ptypes",
     "ptypes/any",
-    "ptypes/struct"
+    "ptypes/duration",
+    "ptypes/struct",
+    "ptypes/timestamp"
   ]
   revision = "bbd03ef6da3a115852eaf24c8a1c46aeb39aa175"
 
@@ -183,8 +187,8 @@
 [[projects]]
   name = "github.com/jackpal/gateway"
   packages = ["."]
-  revision = "3e333950771011fed13be63e62b9f473c5e0d9bf"
-  version = "v1.0.4"
+  revision = "cbcf4e3f3baee7952fc386c8b2534af4d267c875"
+  version = "v1.0.5"
 
 [[projects]]
   name = "github.com/jackpal/go-nat-pmp"
@@ -228,7 +232,7 @@
     "headerfs",
     "headerlist"
   ]
-  revision = "bee0ed11601a4ad0c3b23d462cd71089fc11f2cd"
+  revision = "9a42f7df21be82a69f04caa83bce4034dca72764"
 
 [[projects]]
   name = "github.com/lightningnetwork/lightning-onion"
@@ -242,7 +246,7 @@
     "chaincfg/chainhash",
     "wire"
   ]
-  revision = "01737289d815e0e32c91e55593ba2fbd8d090b2c"
+  revision = "cdab10132e8c6e4a3ffd112dba54791946d28906"
 
 [[projects]]
   name = "github.com/miekg/dns"
@@ -365,22 +369,33 @@
   name = "google.golang.org/grpc"
   packages = [
     ".",
+    "balancer",
+    "balancer/base",
+    "balancer/roundrobin",
     "codes",
     "connectivity",
     "credentials",
-    "grpclb/grpc_lb_v1",
+    "encoding",
+    "encoding/proto",
     "grpclog",
     "internal",
+    "internal/backoff",
+    "internal/channelz",
+    "internal/envconfig",
+    "internal/grpcrand",
+    "internal/transport",
     "keepalive",
     "metadata",
     "naming",
     "peer",
+    "resolver",
+    "resolver/dns",
+    "resolver/passthrough",
     "stats",
     "status",
-    "tap",
-    "transport"
+    "tap"
   ]
-  revision = "b3ddf786825de56a4178401b7e174ee332173b66"
+  revision = "8dea3dc473e90c8179e519d91302d0597c0ca1d1"
 
 [[projects]]
   name = "gopkg.in/errgo.v1"
@@ -404,6 +419,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "e51c8746f7789d36b892509af8e0a4b7cbfdeb3df1493168bee90c142cba0f2b"
+  inputs-digest = "3622a70017e1217d9598e5b45ebbdf90de9fbc7b466473265af593d9260aebbe"
   solver-name = "gps-cdcl"
   solver-version = 1

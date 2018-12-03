@@ -1023,11 +1023,10 @@ type commitmentChain struct {
 	startingHeight uint64
 }
 
-// newCommitmentChain creates a new commitment chain from an initial height.
-func newCommitmentChain(initialHeight uint64) *commitmentChain {
+// newCommitmentChain creates a new commitment chain.
+func newCommitmentChain() *commitmentChain {
 	return &commitmentChain{
-		commitments:    list.New(),
-		startingHeight: initialHeight,
+		commitments: list.New(),
 	}
 }
 
@@ -1381,8 +1380,8 @@ func NewLightningChannel(signer Signer, pCache PreimageCache,
 		Signer:            signer,
 		pCache:            pCache,
 		currentHeight:     localCommit.CommitHeight,
-		remoteCommitChain: newCommitmentChain(remoteCommit.CommitHeight),
-		localCommitChain:  newCommitmentChain(localCommit.CommitHeight),
+		remoteCommitChain: newCommitmentChain(),
+		localCommitChain:  newCommitmentChain(),
 		channelState:      state,
 		localChanCfg:      &state.LocalChanCfg,
 		remoteChanCfg:     &state.RemoteChanCfg,
@@ -3354,7 +3353,7 @@ func (lc *LightningChannel) ProcessChanSyncMsg(
 
 	// We owe them a commitment if the tip of their chain (from our Pov) is
 	// equal to what they think their next commit height should be. We'll
-	// re-send all the updates neccessary to recreate this state, along
+	// re-send all the updates necessary to recreate this state, along
 	// with the commit sig.
 	case msg.NextLocalCommitHeight == remoteTipHeight:
 		walletLog.Debugf("ChannelPoint(%v), sync: remote's next "+
@@ -3446,19 +3445,22 @@ func (lc *LightningChannel) ProcessChanSyncMsg(
 //      it.
 //   3. We didn't get the last RevokeAndAck message they sent, so they'll
 //      re-send it.
-func (lc *LightningChannel) ChanSyncMsg() (*lnwire.ChannelReestablish, error) {
+func ChanSyncMsg(c *channeldb.OpenChannel) (*lnwire.ChannelReestablish, error) {
+	c.Lock()
+	defer c.Unlock()
+
 	// The remote commitment height that we'll send in the
 	// ChannelReestablish message is our current commitment height plus
 	// one. If the receiver thinks that our commitment height is actually
 	// *equal* to this value, then they'll re-send the last commitment that
 	// they sent but we never fully processed.
-	localHeight := lc.localCommitChain.tip().height
+	localHeight := c.LocalCommitment.CommitHeight
 	nextLocalCommitHeight := localHeight + 1
 
 	// The second value we'll send is the height of the remote commitment
 	// from our PoV. If the receiver thinks that their height is actually
 	// *one plus* this value, then they'll re-send their last revocation.
-	remoteChainTipHeight := lc.remoteCommitChain.tail().height
+	remoteChainTipHeight := c.RemoteCommitment.CommitHeight
 
 	// If this channel has undergone a commitment update, then in order to
 	// prove to the remote party our knowledge of their prior commitment
@@ -3466,7 +3468,7 @@ func (lc *LightningChannel) ChanSyncMsg() (*lnwire.ChannelReestablish, error) {
 	// remote party sent.
 	var lastCommitSecret [32]byte
 	if remoteChainTipHeight != 0 {
-		remoteSecret, err := lc.channelState.RevocationStore.LookUp(
+		remoteSecret, err := c.RevocationStore.LookUp(
 			remoteChainTipHeight - 1,
 		)
 		if err != nil {
@@ -3477,7 +3479,7 @@ func (lc *LightningChannel) ChanSyncMsg() (*lnwire.ChannelReestablish, error) {
 
 	// Additionally, we'll send over the current unrevoked commitment on
 	// our local commitment transaction.
-	currentCommitSecret, err := lc.channelState.RevocationProducer.AtIndex(
+	currentCommitSecret, err := c.RevocationProducer.AtIndex(
 		localHeight,
 	)
 	if err != nil {
@@ -3486,7 +3488,7 @@ func (lc *LightningChannel) ChanSyncMsg() (*lnwire.ChannelReestablish, error) {
 
 	return &lnwire.ChannelReestablish{
 		ChanID: lnwire.NewChanIDFromOutPoint(
-			&lc.channelState.FundingOutpoint,
+			&c.FundingOutpoint,
 		),
 		NextLocalCommitHeight:  nextLocalCommitHeight,
 		RemoteCommitTailHeight: remoteChainTipHeight,
@@ -5109,7 +5111,17 @@ func NewUnilateralCloseSummary(chanState *channeldb.OpenChannel, signer Signer,
 		IsPending:               true,
 		RemoteCurrentRevocation: chanState.RemoteCurrentRevocation,
 		RemoteNextRevocation:    chanState.RemoteNextRevocation,
+		ShortChanID:             chanState.ShortChanID(),
 		LocalChanConfig:         chanState.LocalChanCfg,
+	}
+
+	// Attempt to add a channel sync message to the close summary.
+	chanSync, err := ChanSyncMsg(chanState)
+	if err != nil {
+		walletLog.Errorf("ChannelPoint(%v): unable to create channel sync "+
+			"message: %v", chanState.FundingOutpoint, err)
+	} else {
+		closeSummary.LastChanSyncMsg = chanSync
 	}
 
 	return &UnilateralCloseSummary{
@@ -6187,7 +6199,7 @@ func (lc *LightningChannel) IsPending() bool {
 	return lc.channelState.IsPending
 }
 
-// State provides access to the channel's internal state for testing.
+// State provides access to the channel's internal state.
 func (lc *LightningChannel) State() *channeldb.OpenChannel {
 	return lc.channelState
 }

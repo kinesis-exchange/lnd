@@ -126,7 +126,8 @@ func (cfg nodeConfig) RESTAddr() string {
 }
 
 func (cfg nodeConfig) DBPath() string {
-	return filepath.Join(cfg.DataDir, "graph", "simnet/channel.db")
+	return filepath.Join(cfg.DataDir, "graph",
+		fmt.Sprintf("%v/channel.db", cfg.NetParams.Name))
 }
 
 // genArgs generates a slice of command line arguments from the lightning node
@@ -148,7 +149,7 @@ func (cfg nodeConfig) genArgs() []string {
 	args = append(args, "--nobootstrap")
 	args = append(args, "--debuglevel=debug")
 	args = append(args, "--bitcoin.defaultchanconfs=1")
-	args = append(args, "--bitcoin.defaultremotedelay=4")
+	args = append(args, fmt.Sprintf("--bitcoin.defaultremotedelay=%v", DefaultCSV))
 	args = append(args, fmt.Sprintf("--btcd.rpchost=%v", cfg.RPCConfig.Host))
 	args = append(args, fmt.Sprintf("--btcd.rpcuser=%v", cfg.RPCConfig.User))
 	args = append(args, fmt.Sprintf("--btcd.rpcpass=%v", cfg.RPCConfig.Pass))
@@ -165,7 +166,6 @@ func (cfg nodeConfig) genArgs() []string {
 	args = append(args, fmt.Sprintf("--adminmacaroonpath=%v", cfg.AdminMacPath))
 	args = append(args, fmt.Sprintf("--readonlymacaroonpath=%v", cfg.ReadMacPath))
 	args = append(args, fmt.Sprintf("--invoicemacaroonpath=%v", cfg.InvoiceMacPath))
-	args = append(args, fmt.Sprintf("--externalip=%s", cfg.P2PAddr()))
 	args = append(args, fmt.Sprintf("--trickledelay=%v", trickleDelay))
 
 	if !cfg.HasSeed {
@@ -203,6 +203,16 @@ type HarnessNode struct {
 	processExit chan struct{}
 
 	chanWatchRequests chan *chanWatchRequest
+
+	// For each outpoint, we'll track an integer which denotes the number of
+	// edges seen for that channel within the network. When this number
+	// reaches 2, then it means that both edge advertisements has propagated
+	// through the network.
+	openChans   map[wire.OutPoint]int
+	openClients map[wire.OutPoint][]chan struct{}
+
+	closedChans  map[wire.OutPoint]struct{}
+	closeClients map[wire.OutPoint][]chan struct{}
 
 	quit chan struct{}
 	wg   sync.WaitGroup
@@ -242,6 +252,11 @@ func newNode(cfg nodeConfig) (*HarnessNode, error) {
 		cfg:               &cfg,
 		NodeID:            nodeNum,
 		chanWatchRequests: make(chan *chanWatchRequest),
+		openChans:         make(map[wire.OutPoint]int),
+		openClients:       make(map[wire.OutPoint][]chan struct{}),
+
+		closedChans:  make(map[wire.OutPoint]struct{}),
+		closeClients: make(map[wire.OutPoint][]chan struct{}),
 	}, nil
 }
 
@@ -673,16 +688,6 @@ func (hn *HarnessNode) lightningNetworkWatcher() {
 		}
 	}()
 
-	// For each outpoint, we'll track an integer which denotes the number
-	// of edges seen for that channel within the network. When this number
-	// reaches 2, then it means that both edge advertisements has
-	// propagated through the network.
-	openChans := make(map[wire.OutPoint]int)
-	openClients := make(map[wire.OutPoint][]chan struct{})
-
-	closedChans := make(map[wire.OutPoint]struct{})
-	closeClients := make(map[wire.OutPoint][]chan struct{})
-
 	for {
 		select {
 
@@ -699,21 +704,21 @@ func (hn *HarnessNode) lightningNetworkWatcher() {
 					Hash:  *txid,
 					Index: newChan.ChanPoint.OutputIndex,
 				}
-				openChans[op]++
+				hn.openChans[op]++
 
 				// For this new channel, if the number of edges
 				// seen is less than two, then the channel
 				// hasn't been fully announced yet.
-				if numEdges := openChans[op]; numEdges < 2 {
+				if numEdges := hn.openChans[op]; numEdges < 2 {
 					continue
 				}
 
 				// Otherwise, we'll notify all the registered
 				// clients and remove the dispatched clients.
-				for _, eventChan := range openClients[op] {
+				for _, eventChan := range hn.openClients[op] {
 					close(eventChan)
 				}
-				delete(openClients, op)
+				delete(hn.openClients, op)
 			}
 
 			// For each channel closed, we'll mark that we've
@@ -726,14 +731,14 @@ func (hn *HarnessNode) lightningNetworkWatcher() {
 					Hash:  *txid,
 					Index: closedChan.ChanPoint.OutputIndex,
 				}
-				closedChans[op] = struct{}{}
+				hn.closedChans[op] = struct{}{}
 
 				// As the channel has been closed, we'll notify
 				// all register clients.
-				for _, eventChan := range closeClients[op] {
+				for _, eventChan := range hn.closeClients[op] {
 					close(eventChan)
 				}
-				delete(closeClients, op)
+				delete(hn.closeClients, op)
 			}
 
 		// A new watch request, has just arrived. We'll either be able
@@ -748,30 +753,34 @@ func (hn *HarnessNode) lightningNetworkWatcher() {
 				// If this is an open request, then it can be
 				// dispatched if the number of edges seen for
 				// the channel is at least two.
-				if numEdges := openChans[targetChan]; numEdges >= 2 {
+				if numEdges := hn.openChans[targetChan]; numEdges >= 2 {
 					close(watchRequest.eventChan)
 					continue
 				}
 
 				// Otherwise, we'll add this to the list of
 				// watch open clients for this out point.
-				openClients[targetChan] = append(openClients[targetChan],
-					watchRequest.eventChan)
+				hn.openClients[targetChan] = append(
+					hn.openClients[targetChan],
+					watchRequest.eventChan,
+				)
 				continue
 			}
 
 			// If this is a close request, then it can be
 			// immediately dispatched if we've already seen a
 			// channel closure for this channel.
-			if _, ok := closedChans[targetChan]; ok {
+			if _, ok := hn.closedChans[targetChan]; ok {
 				close(watchRequest.eventChan)
 				continue
 			}
 
 			// Otherwise, we'll add this to the list of close watch
 			// clients for this out point.
-			closeClients[targetChan] = append(closeClients[targetChan],
-				watchRequest.eventChan)
+			hn.closeClients[targetChan] = append(
+				hn.closeClients[targetChan],
+				watchRequest.eventChan,
+			)
 
 		case <-hn.quit:
 			return

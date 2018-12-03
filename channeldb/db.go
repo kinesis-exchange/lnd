@@ -12,6 +12,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/coreos/bbolt"
 	"github.com/go-errors/errors"
+	"github.com/lightningnetwork/lnd/lnwire"
 )
 
 const (
@@ -79,6 +80,13 @@ var (
 			// from the edge update index.
 			number:    6,
 			migration: migratePruneEdgeUpdateIndex,
+		},
+		{
+			// The DB version that migrates the ChannelCloseSummary
+			// to a format where optional fields are indicated with
+			// boolean flags.
+			number:    7,
+			migration: migrateOptionalChannelCloseSummaryFields,
 		},
 	}
 
@@ -450,7 +458,7 @@ func (d *DB) FetchWaitingCloseChannels() ([]*OpenChannel, error) {
 // fetchChannels attempts to retrieve channels currently stored in the
 // database. The pending parameter determines whether only pending channels
 // will be returned, or only open channels will be returned. The waitingClose
-// parameter determines wheter only channels waiting for a closing transaction
+// parameter determines whether only channels waiting for a closing transaction
 // to be confirmed should be returned. If no active channels exist within the
 // network, then ErrNoActiveChannels is returned.
 func fetchChannels(d *DB, pending, waitingClose bool) ([]*OpenChannel, error) {
@@ -602,6 +610,54 @@ func (d *DB) FetchClosedChannel(chanID *wire.OutPoint) (*ChannelCloseSummary, er
 		chanSummary, err = deserializeCloseChannelSummary(summaryReader)
 
 		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	return chanSummary, nil
+}
+
+// FetchClosedChannelForID queries for a channel close summary using the
+// channel ID of the channel in question.
+func (d *DB) FetchClosedChannelForID(cid lnwire.ChannelID) (
+	*ChannelCloseSummary, error) {
+
+	var chanSummary *ChannelCloseSummary
+	if err := d.View(func(tx *bolt.Tx) error {
+		closeBucket := tx.Bucket(closedChannelBucket)
+		if closeBucket == nil {
+			return ErrClosedChannelNotFound
+		}
+
+		// The first 30 bytes of the channel ID and outpoint will be
+		// equal.
+		cursor := closeBucket.Cursor()
+		op, c := cursor.Seek(cid[:30])
+
+		// We scan over all possible candidates for this channel ID.
+		for ; op != nil && bytes.Compare(cid[:30], op[:30]) <= 0; op, c = cursor.Next() {
+			var outPoint wire.OutPoint
+			err := readOutpoint(bytes.NewReader(op), &outPoint)
+			if err != nil {
+				return err
+			}
+
+			// If the found outpoint does not correspond to this
+			// channel ID, we continue.
+			if !cid.IsChanPoint(&outPoint) {
+				continue
+			}
+
+			// Deserialize the close summary and return.
+			r := bytes.NewReader(c)
+			chanSummary, err = deserializeCloseChannelSummary(r)
+			if err != nil {
+				return err
+			}
+
+			return nil
+		}
+		return ErrClosedChannelNotFound
 	}); err != nil {
 		return nil, err
 	}
