@@ -10,10 +10,6 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/gcs/builder"
-<<<<<<< HEAD
-	"github.com/btcsuite/btcwallet/waddrmgr"
-=======
->>>>>>> v0.5.1-beta
 	"github.com/lightninglabs/neutrino"
 	"github.com/lightningnetwork/lnd/channeldb"
 )
