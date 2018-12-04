@@ -158,7 +158,7 @@ func TestInvoiceWorkflow(t *testing.T) {
 	// Add the invoice to the database, this should succeed as there aren't
 	// any existing invoices within the database with the same payment
 	// hash.
-	if err := db.AddInvoice(fakeExternalPreimageInvoice); err != nil {
+	if _, err := db.AddInvoice(fakeExternalPreimageInvoice); err != nil {
 		t.Fatalf("unable to add invoice: %v", err)
 	}
 
@@ -176,7 +176,7 @@ func TestInvoiceWorkflow(t *testing.T) {
 
 	// Attempt to insert generated above again, this should fail as
 	// duplicates are rejected by the processing logic.
-	if err := db.AddInvoice(fakeExternalPreimageInvoice); err != ErrDuplicateInvoice {
+	if _, err := db.AddInvoice(fakeExternalPreimageInvoice); err != ErrDuplicateInvoice {
 		t.Fatalf("invoice insertion should fail due to duplication, "+
 			"instead %v", err)
 	}
