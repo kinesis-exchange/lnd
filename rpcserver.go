@@ -2974,7 +2974,7 @@ func createRPCInvoice(invoice *channeldb.Invoice) (*lnrpc.Invoice, error) {
 		Memo:             string(invoice.Memo[:]),
 		Receipt:          invoice.Receipt[:],
 		ExternalPreimage: invoice.Terms.ExternalPreimage,
-		RHash:            decoded.PaymentHash[:],
+		RHash:            paymentHash,
 		RPreimage:        preimage[:],
 		Value:            int64(satAmt),
 		CreationDate:     invoice.CreationDate.Unix(),
