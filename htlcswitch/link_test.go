@@ -574,10 +574,9 @@ func TestExitNodeExternalPreimagePayment(t *testing.T) {
 	// * settle request to be sent back from bob to alice.
 	// * alice<->bob commitment state to be updated.
 	// * user notification to be sent.
-	receiver := n.bobServer
-	rhash, err := n.makeExtpreimagePayment(n.aliceServer, receiver,
-		n.bobServer.PubKey(), hops, amount, htlcAmt,
-		totalTimelock, preimage).Wait(30 * time.Second)
+	firstHop := n.firstBobChannelLink.ShortChanID()
+	rhash, err := n.makeExtpreimagePayment(n.aliceServer, n.bobServer, firstHop,
+		hops, amount, htlcAmt, totalTimelock, preimage).Wait(30 * time.Second)
 	if err != nil {
 		t.Fatalf("unable to make the payment: %v", err)
 	}
@@ -589,7 +588,7 @@ func TestExitNodeExternalPreimagePayment(t *testing.T) {
 
 	// Check that alice invoice was settled and bandwidth of HTLC
 	// links was changed.
-	invoice, err := receiver.registry.LookupInvoice(rhash)
+	invoice, _, err := receiver.registry.LookupInvoice(rhash)
 	if err != nil {
 		t.Fatalf("unable to get invoice: %v", err)
 	}
@@ -667,10 +666,9 @@ func TestExitNodeExternalPreimagePermanentFail(t *testing.T) {
 	// * settle request to be sent back from bob to alice.
 	// * alice<->bob commitment state to be updated.
 	// * user notification to be sent.
-	receiver := n.bobServer
-	_, err = n.makeExtpreimagePayment(n.aliceServer, receiver,
-		n.bobServer.PubKey(), hops, amount, htlcAmt,
-		totalTimelock, preimage).Wait(30 * time.Second)
+	firstHop := n.firstBobChannelLink.ShortChanID()
+	_, err = n.makeExtpreimagePayment(n.aliceServer, n.bobServer, firstHop,
+		hops, amount, htlcAmt, totalTimelock, preimage).Wait(30 * time.Second)
 
 	if err == nil {
 		t.Fatalf("payment should have failed but didn't")
