@@ -91,12 +91,6 @@ var (
 // defers created in the top-level scope of a main method aren't executed if
 // os.Exit() is called.
 func lndMain() error {
-	defer func() {
-		if logRotatorPipe != nil {
-			ltndLog.Info("Shutdown complete")
-		}
-	}()
-
 	// Load the configuration, and parse any command line options. This
 	// function will also set up logging properly.
 	loadedConfig, err := loadConfig()
