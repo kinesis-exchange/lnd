@@ -94,14 +94,6 @@ type edgePolicyWithSource struct {
 	edge       *channeldb.ChannelEdgePolicy
 }
 
-// edgePolicyWithSource is a helper struct to keep track of the source node
-// of a channel edge. ChannelEdgePolicy only contains to destination node
-// of the edge.
-type edgePolicyWithSource struct {
-	sourceNode *channeldb.LightningNode
-	edge       *channeldb.ChannelEdgePolicy
-}
-
 // computeFee computes the fee to forward an HTLC of `amt` milli-satoshis over
 // the passed active payment channel. This value is currently computed as
 // specified in BOLT07, but will likely change in the near future.
