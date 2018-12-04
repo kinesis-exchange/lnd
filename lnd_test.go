@@ -3001,7 +3001,7 @@ func testSphinxReplayPersistence(net *lntest.NetworkHarness, t *harnessTest) {
 	// expects a payment of 1000 satoshis from Carol paid via a particular
 	// preimage.
 	const paymentAmt = 1000
-	preimage := bytes.Repeat([]byte("C"), 32)
+	preimage := bytes.Repeat([]byte("A"), 32)
 	invoice := &lnrpc.Invoice{
 		Memo:      "testing",
 		RPreimage: preimage,
@@ -7712,14 +7712,6 @@ type graphSubscription struct {
 	quit       chan struct{}
 }
 
-// graphSubscription houses the proxied update and error chans for a node's
-// graph subscriptions.
-type graphSubscription struct {
-	updateChan chan *lnrpc.GraphTopologyUpdate
-	errChan    chan error
-	quit       chan struct{}
-}
-
 // subscribeGraphNotifications subscribes to channel graph updates and launches
 // a goroutine that forwards these to the returned channel.
 func subscribeGraphNotifications(t *harnessTest, ctxb context.Context,
@@ -9887,15 +9879,6 @@ func testMultiHopHtlcLocalChainClaim(net *lntest.NetworkHarness, t *harnessTest)
 	if tx.MsgTx().TxIn[0].PreviousOutPoint.Hash != *bobSecondLvlTx {
 		t.Fatalf("tx did not spend from bob's second level tx")
 	}
-	if tx.MsgTx().TxIn[0].PreviousOutPoint.Hash != *bobSecondLvlTx {
-		t.Fatalf("tx did not spend from bob's second level tx")
-	}
-
-	// When we mine one additional block, that will confirm Bob's sweep.
-	// Now Bob should have no pending channels anymore, as this just
-	// resolved it by the confirmation of the sweep transaction.
-	block = mineBlocks(t, net, 1)[0]
-	assertTxInBlock(t, block, bobSweep)
 
 	// When we mine one additional block, that will confirm Bob's sweep.
 	// Now Bob should have no pending channels anymore, as this just
@@ -10163,9 +10146,12 @@ func testMultiHopHtlcRemoteChainClaim(net *lntest.NetworkHarness, t *harnessTest
 	assertTxInBlock(t, block, bobHtlcSweep)
 	carolSecondLevelCSV--
 
-	pendingChansRequest = &lnrpc.PendingChannelsRequest{}
+	// Now that the sweeping transaction has been confirmed, Bob should now
+	// recognize that all contracts have been fully resolved, and show no
+	// pending close channels.
+	pendingChansRequest := &lnrpc.PendingChannelsRequest{}
 	err = lntest.WaitPredicate(func() bool {
-		pendingChanResp, err := carol.PendingChannels(
+		pendingChanResp, err := net.Bob.PendingChannels(
 			ctxb, pendingChansRequest,
 		)
 		if err != nil {
@@ -10174,7 +10160,7 @@ func testMultiHopHtlcRemoteChainClaim(net *lntest.NetworkHarness, t *harnessTest
 			return false
 		}
 		if len(pendingChanResp.PendingForceClosingChannels) != 0 {
-			predErr = fmt.Errorf("carol still has pending channels "+
+			predErr = fmt.Errorf("bob still has pending channels "+
 				"but shouldn't: %v", spew.Sdump(pendingChanResp))
 			return false
 		}
