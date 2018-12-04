@@ -675,12 +675,6 @@ func (d *DB) AddInvoicePreimage(paymentHash [32]byte,
 		if err != nil {
 			return err
 		}
-		settleIndex, err := invoices.CreateBucketIfNotExists(
-			settleIndexBucket,
-		)
-		if err != nil {
-			return err
-		}
 
 		// Check the invoice index to see if an invoice paying to this
 		// hash exists within the DB.
