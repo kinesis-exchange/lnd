@@ -588,7 +588,7 @@ func TestExitNodeExternalPreimagePayment(t *testing.T) {
 
 	// Check that alice invoice was settled and bandwidth of HTLC
 	// links was changed.
-	invoice, _, err := receiver.registry.LookupInvoice(rhash)
+	invoice, _, err := n.bobServer.registry.LookupInvoice(rhash)
 	if err != nil {
 		t.Fatalf("unable to get invoice: %v", err)
 	}
