@@ -658,7 +658,7 @@ func (d *DB) SettleInvoice(paymentHash [32]byte,
 	return settledInvoice, nil
 }
 
-// addInvoicePreimage attempts to update an invoice with an External Preimage
+// AddInvoicePreimage attempts to update an invoice with an External Preimage
 // to save that preimage locally, allowing us to re-use it for duplicate
 // payments and provide it to listeners via LookupInvoice. If an invoice
 // matching this hash does not exist, it will fail with a "not found" error.
