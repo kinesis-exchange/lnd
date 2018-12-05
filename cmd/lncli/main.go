@@ -275,6 +275,7 @@ func main() {
 		listInvoicesCommand,
 		listChannelsCommand,
 		closedChannelsCommand,
+		lookupPaymentStatusCommand,
 		listPaymentsCommand,
 		describeGraphCommand,
 		getChanInfoCommand,
