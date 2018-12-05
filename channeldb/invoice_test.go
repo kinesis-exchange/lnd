@@ -169,7 +169,7 @@ func TestInvoiceWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to find invoice: %v", err)
 	}
-	if !reflect.DeepEqual(fakeExternalPreimageInvoice, dbExternalPreimageInvoice) {
+	if !reflect.DeepEqual(*fakeExternalPreimageInvoice, dbExternalPreimageInvoice) {
 		t.Fatalf("invoice fetched from db doesn't match original %v vs %v",
 			spew.Sdump(fakeExternalPreimageInvoice), spew.Sdump(dbExternalPreimageInvoice))
 	}
@@ -213,7 +213,8 @@ func TestInvoiceWorkflow(t *testing.T) {
 	amt := lnwire.NewMSatFromSatoshis(1000)
 	invoices := make([]*Invoice, numInvoices+1)
 	invoices[0] = &dbInvoice2
-	for i := 1; i < len(invoices)-1; i++ {
+	invoices[1] = &dbLocalPreimageInvoice
+	for i := 2; i < len(invoices)-1; i++ {
 		invoice, err := randInvoice(amt)
 		if err != nil {
 			t.Fatalf("unable to create invoice: %v", err)
