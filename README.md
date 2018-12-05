@@ -29,7 +29,7 @@ through the network.
 ## Lightning Network Specification Compliance
 `lnd` _fully_ conforms to the [Lightning Network specification
 (BOLTs)](https://github.com/lightningnetwork/lightning-rfc). BOLT stands for:
-Basic of Lightning Technologies. The specifications are currently being drafted
+Basis of Lightning Technology. The specifications are currently being drafted
 by several groups of implementers based around the world including the
 developers of `lnd`. The set of specification documents as well as our
 implementation of the specification are still a work-in-progress. With that
@@ -78,7 +78,7 @@ discuss various aspects of `lnd` and also Lightning in general.
 ## Security
 
 The developers of `lnd` take security _very_ seriously. The disclosure of
-security vulnerabilities helps us security the health of `lnd`, privacy of our
+security vulnerabilities helps us secure the health of `lnd`, privacy of our
 users, and also the health of the Lightning Network as a whole.  If you find
 any issues regarding security or privacy, please disclose the information
 responsibly by sending an email to security at lightning dot engineering,

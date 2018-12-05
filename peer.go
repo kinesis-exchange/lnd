@@ -16,6 +16,7 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/davecgh/go-spew/spew"
+
 	"github.com/lightningnetwork/lnd/brontide"
 	"github.com/lightningnetwork/lnd/chainntnfs"
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -45,6 +46,9 @@ const (
 	// writeMessageTimeout is the timeout used when writing a message to peer.
 	writeMessageTimeout = 50 * time.Second
 
+	// handshakeTimeout is the timeout used when waiting for peer init message.
+	handshakeTimeout = 15 * time.Second
+
 	// outgoingQueueLen is the buffer size of the channel which houses
 	// messages to be sent across the wire, requested by objects outside
 	// this struct.
@@ -59,12 +63,12 @@ type outgoingMsg struct {
 	errChan chan error // MUST be buffered.
 }
 
-// newChannelMsg packages an lnwallet.LightningChannel with a channel that
-// allows the receiver of the request to report when the funding transaction
-// has been confirmed and the channel creation process completed.
+// newChannelMsg packages a channeldb.OpenChannel with a channel that allows
+// the receiver of the request to report when the funding transaction has been
+// confirmed and the channel creation process completed.
 type newChannelMsg struct {
-	channel *lnwallet.LightningChannel
-	done    chan struct{}
+	channel *channeldb.OpenChannel
+	err     chan error
 }
 
 // closeMsgs is a wrapper struct around any wire messages that deal with the
@@ -268,10 +272,10 @@ func (p *peer) Start() error {
 
 	select {
 	// In order to avoid blocking indefinitely, we'll give the other peer
-	// an upper timeout of 15 seconds to respond before we bail out early.
-	case <-time.After(time.Second * 15):
-		return fmt.Errorf("peer did not complete handshake within 5 " +
-			"seconds")
+	// an upper timeout to respond before we bail out early.
+	case <-time.After(handshakeTimeout):
+		return fmt.Errorf("peer did not complete handshake within %v",
+			handshakeTimeout)
 	case err := <-readErr:
 		if err != nil {
 			return fmt.Errorf("unable to read init msg: %v", err)
@@ -488,10 +492,12 @@ func (p *peer) loadActiveChannels(chans []*channeldb.OpenChannel) error {
 		p.activeChannels[chanID] = lnChan
 		p.activeChanMtx.Unlock()
 
-		// Only if the channel is public do we need to collect it for
-		// sending out a new enable update.
+		// To ensure we can route through this channel now that the peer
+		// is back online, we'll attempt to send an update to enable it.
+		// This will only be used for non-pending public channels, as
+		// they are the only ones capable of routing.
 		chanIsPublic := dbChan.ChannelFlags&lnwire.FFAnnounceChannel != 0
-		if chanIsPublic {
+		if chanIsPublic && !dbChan.IsPending {
 			activePublicChans = append(activePublicChans, *chanPoint)
 		}
 	}
@@ -505,9 +511,9 @@ func (p *peer) loadActiveChannels(chans []*channeldb.OpenChannel) error {
 			// ChannelUpdate. If this channel is already active,
 			// the update won't be sent.
 			err := p.server.announceChanStatus(chanPoint, false)
-			if err != nil {
-				peerLog.Errorf("unable to send out active "+
-					"channel update: %v", err)
+			if err != nil && err != channeldb.ErrEdgeNotFound {
+				srvrLog.Errorf("Unable to enable channel %v: %v",
+					chanPoint, err)
 			}
 		}
 	}()
@@ -791,7 +797,7 @@ func (ms *msgStream) msgConsumer() {
 
 // AddMsg adds a new message to the msgStream. This function is safe for
 // concurrent access.
-func (ms *msgStream) AddMsg(msg lnwire.Message, quit chan struct{}) {
+func (ms *msgStream) AddMsg(msg lnwire.Message) {
 	// First, we'll attempt to receive from the producerSema struct. This
 	// acts as a sempahore to prevent us from indefinitely buffering
 	// incoming items from the wire. Either the msg queue isn't full, and
@@ -799,7 +805,7 @@ func (ms *msgStream) AddMsg(msg lnwire.Message, quit chan struct{}) {
 	// we're signalled to quit, or a slot is freed up.
 	select {
 	case <-ms.producerSema:
-	case <-quit:
+	case <-ms.peer.quit:
 		return
 	case <-ms.quit:
 		return
@@ -831,11 +837,11 @@ func newChanMsgStream(p *peer, cid lnwire.ChannelID) *msgStream {
 		fmt.Sprintf("Update stream for ChannelID(%x) exiting", cid[:]),
 		1000,
 		func(msg lnwire.Message) {
-			_, isChanSycMsg := msg.(*lnwire.ChannelReestablish)
+			_, isChanSyncMsg := msg.(*lnwire.ChannelReestablish)
 
 			// If this is the chanSync message, then we'll deliver
 			// it immediately to the active link.
-			if !isChanSycMsg {
+			if !isChanSyncMsg {
 				// We'll send a message to the funding manager
 				// and wait iff an active funding process for
 				// this channel hasn't yet completed.  We do
@@ -869,9 +875,36 @@ func newChanMsgStream(p *peer, cid lnwire.ChannelID) *msgStream {
 			// active goroutine dedicated to this channel.
 			if chanLink == nil {
 				link, err := p.server.htlcSwitch.GetLink(cid)
-				if err != nil {
-					peerLog.Errorf("recv'd update for unknown "+
-						"channel %v from %v", cid, p)
+				switch {
+
+				// If we failed to find the link in question,
+				// and the message received was a channel sync
+				// message, then this might be a peer trying to
+				// resync closed channel. In this case we'll
+				// try to resend our last channel sync message,
+				// such that the peer can recover funds from
+				// the closed channel.
+				case err != nil && isChanSyncMsg:
+					peerLog.Debugf("Unable to find "+
+						"link(%v) to handle channel "+
+						"sync, attempting to resend "+
+						"last ChanSync message", cid)
+
+					err := p.resendChanSyncMsg(cid)
+					if err != nil {
+						// TODO(halseth): send error to
+						// peer?
+						peerLog.Errorf(
+							"resend failed: %v",
+							err,
+						)
+					}
+					return
+
+				case err != nil:
+					peerLog.Errorf("recv'd update for "+
+						"unknown channel %v from %v: "+
+						"%v", cid, p, err)
 					return
 				}
 				chanLink = link
@@ -1017,7 +1050,7 @@ out:
 			// forward the error to all channels with this peer.
 			case msg.ChanID == lnwire.ConnectionWideID:
 				for chanID, chanStream := range chanMsgStreams {
-					chanStream.AddMsg(nextMsg, p.quit)
+					chanStream.AddMsg(nextMsg)
 
 					// Also marked this channel as failed,
 					// so we won't try to restart it on
@@ -1079,7 +1112,7 @@ out:
 			*lnwire.ReplyChannelRange,
 			*lnwire.ReplyShortChanIDsEnd:
 
-			discStream.AddMsg(msg, p.quit)
+			discStream.AddMsg(msg)
 
 		default:
 			peerLog.Errorf("unknown message %v received from peer "+
@@ -1102,7 +1135,7 @@ out:
 
 			// With the stream obtained, add the message to the
 			// stream so we can continue processing message.
-			chanStream.AddMsg(nextMsg, p.quit)
+			chanStream.AddMsg(nextMsg)
 		}
 
 		idleTimer.Reset(idleTimeout)
@@ -1523,9 +1556,9 @@ out:
 		// funding workflow. We'll initialize the necessary local
 		// state, and notify the htlc switch of a new link.
 		case newChanReq := <-p.newChannels:
-			chanPoint := newChanReq.channel.ChannelPoint()
-			chanID := lnwire.NewChanIDFromOutPoint(chanPoint)
 			newChan := newChanReq.channel
+			chanPoint := &newChan.FundingOutpoint
+			chanID := lnwire.NewChanIDFromOutPoint(chanPoint)
 
 			// Make sure this channel is not already active.
 			p.activeChanMtx.Lock()
@@ -1534,8 +1567,7 @@ out:
 					"ignoring.", chanPoint)
 
 				p.activeChanMtx.Unlock()
-				close(newChanReq.done)
-				newChanReq.channel.Stop()
+				close(newChanReq.err)
 
 				// If we're being sent a new channel, and our
 				// existing channel doesn't have the next
@@ -1549,7 +1581,7 @@ out:
 					"FundingLocked for ChannelPoint(%v)",
 					chanPoint)
 
-				nextRevoke := newChan.RemoteNextRevocation()
+				nextRevoke := newChan.RemoteNextRevocation
 				err := currentChan.InitNextRevocation(nextRevoke)
 				if err != nil {
 					peerLog.Errorf("unable to init chan "+
@@ -1563,7 +1595,21 @@ out:
 			// If not already active, we'll add this channel to the
 			// set of active channels, so we can look it up later
 			// easily according to its channel ID.
-			p.activeChannels[chanID] = newChan
+			lnChan, err := lnwallet.NewLightningChannel(
+				p.server.cc.signer, p.server.witnessBeacon,
+				newChan,
+			)
+			if err != nil {
+				p.activeChanMtx.Unlock()
+				err := fmt.Errorf("unable to create "+
+					"LightningChannel: %v", err)
+				peerLog.Errorf(err.Error())
+
+				newChanReq.err <- err
+				continue
+			}
+
+			p.activeChannels[chanID] = lnChan
 			p.activeChanMtx.Unlock()
 
 			peerLog.Infof("New channel active ChannelPoint(%v) "+
@@ -1575,15 +1621,24 @@ out:
 			// TODO(roasbeef): panic on below?
 			_, currentHeight, err := p.server.cc.chainIO.GetBestBlock()
 			if err != nil {
-				peerLog.Errorf("unable to get best block: %v", err)
+				err := fmt.Errorf("unable to get best "+
+					"block: %v", err)
+				peerLog.Errorf(err.Error())
+
+				lnChan.Stop()
+				newChanReq.err <- err
 				continue
 			}
 			chainEvents, err := p.server.chainArb.SubscribeChannelEvents(
 				*chanPoint,
 			)
 			if err != nil {
-				peerLog.Errorf("unable to subscribe to chain "+
-					"events: %v", err)
+				err := fmt.Errorf("unable to subscribe to "+
+					"chain events: %v", err)
+				peerLog.Errorf(err.Error())
+
+				lnChan.Stop()
+				newChanReq.err <- err
 				continue
 			}
 
@@ -1592,7 +1647,7 @@ out:
 			// forwarded. For fees we'll use the default values, as
 			// they currently are always set to the default values
 			// at initial channel creation.
-			fwdMinHtlc := newChan.FwdMinHtlc()
+			fwdMinHtlc := lnChan.FwdMinHtlc()
 			defaultPolicy := p.server.cc.routingPolicy
 			forwardingPolicy := &htlcswitch.ForwardingPolicy{
 				MinHTLC:       fwdMinHtlc,
@@ -1603,16 +1658,21 @@ out:
 
 			// Create the link and add it to the switch.
 			err = p.addLink(
-				chanPoint, newChan, forwardingPolicy,
+				chanPoint, lnChan, forwardingPolicy,
 				chainEvents, currentHeight, false,
 			)
 			if err != nil {
-				peerLog.Errorf("can't register new channel "+
+				err := fmt.Errorf("can't register new channel "+
 					"link(%v) with NodeKey(%x)", chanPoint,
 					p.PubKey())
+				peerLog.Errorf(err.Error())
+
+				lnChan.Stop()
+				newChanReq.err <- err
+				continue
 			}
 
-			close(newChanReq.done)
+			close(newChanReq.err)
 
 		// We've just received a local request to close an active
 		// channel. If will either kick of a cooperative channel
@@ -2111,6 +2171,35 @@ func (p *peer) sendInitMsg() error {
 	return p.writeMessage(msg)
 }
 
+// resendChanSyncMsg will attempt to find a channel sync message for the closed
+// channel and resend it to our peer.
+func (p *peer) resendChanSyncMsg(cid lnwire.ChannelID) error {
+	// Check if we have any channel sync messages stored for this channel.
+	c, err := p.server.chanDB.FetchClosedChannelForID(cid)
+	if err != nil {
+		return fmt.Errorf("unable to fetch channel sync messages for "+
+			"peer %v: %v", p, err)
+	}
+
+	if c.LastChanSyncMsg == nil {
+		return fmt.Errorf("no chan sync message stored for channel %v",
+			cid)
+	}
+
+	peerLog.Debugf("Re-sending channel sync message for channel %v to "+
+		"peer %v", cid, p)
+
+	if err := p.SendMessage(true, c.LastChanSyncMsg); err != nil {
+		return fmt.Errorf("Failed resending channel sync "+
+			"message to peer %v: %v", p, err)
+	}
+
+	peerLog.Debugf("Re-sent channel sync message for channel %v to peer "+
+		"%v", cid, p)
+
+	return nil
+}
+
 // SendMessage sends a variadic number of message to remote peer. The first
 // argument denotes if the method should block until the message has been sent
 // to the remote peer.
@@ -2172,13 +2261,13 @@ func (p *peer) Address() net.Addr {
 // added if the cancel channel is closed.
 //
 // NOTE: Part of the lnpeer.Peer interface.
-func (p *peer) AddNewChannel(channel *lnwallet.LightningChannel,
+func (p *peer) AddNewChannel(channel *channeldb.OpenChannel,
 	cancel <-chan struct{}) error {
 
-	newChanDone := make(chan struct{})
+	errChan := make(chan error, 1)
 	newChanMsg := &newChannelMsg{
 		channel: channel,
-		done:    newChanDone,
+		err:     errChan,
 	}
 
 	select {
@@ -2192,12 +2281,11 @@ func (p *peer) AddNewChannel(channel *lnwallet.LightningChannel,
 	// We pause here to wait for the peer to recognize the new channel
 	// before we close the channel barrier corresponding to the channel.
 	select {
-	case <-newChanDone:
+	case err := <-errChan:
+		return err
 	case <-p.quit:
 		return ErrPeerExiting
 	}
-
-	return nil
 }
 
 // StartTime returns the time at which the connection was established if the

@@ -158,7 +158,7 @@ func TestInvoiceWorkflow(t *testing.T) {
 	// Add the invoice to the database, this should succeed as there aren't
 	// any existing invoices within the database with the same payment
 	// hash.
-	if err := db.AddInvoice(fakeExternalPreimageInvoice); err != nil {
+	if _, err := db.AddInvoice(fakeExternalPreimageInvoice); err != nil {
 		t.Fatalf("unable to add invoice: %v", err)
 	}
 
@@ -169,14 +169,14 @@ func TestInvoiceWorkflow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to find invoice: %v", err)
 	}
-	if !reflect.DeepEqual(fakeExternalPreimageInvoice, dbExternalPreimageInvoice) {
+	if !reflect.DeepEqual(*fakeExternalPreimageInvoice, dbExternalPreimageInvoice) {
 		t.Fatalf("invoice fetched from db doesn't match original %v vs %v",
 			spew.Sdump(fakeExternalPreimageInvoice), spew.Sdump(dbExternalPreimageInvoice))
 	}
 
 	// Attempt to insert generated above again, this should fail as
 	// duplicates are rejected by the processing logic.
-	if err := db.AddInvoice(fakeExternalPreimageInvoice); err != ErrDuplicateInvoice {
+	if _, err := db.AddInvoice(fakeExternalPreimageInvoice); err != ErrDuplicateInvoice {
 		t.Fatalf("invoice insertion should fail due to duplication, "+
 			"instead %v", err)
 	}
@@ -213,7 +213,8 @@ func TestInvoiceWorkflow(t *testing.T) {
 	amt := lnwire.NewMSatFromSatoshis(1000)
 	invoices := make([]*Invoice, numInvoices+1)
 	invoices[0] = &dbInvoice2
-	for i := 1; i < len(invoices)-1; i++ {
+	invoices[1] = &dbLocalPreimageInvoice
+	for i := 2; i < len(invoices)-1; i++ {
 		invoice, err := randInvoice(amt)
 		if err != nil {
 			t.Fatalf("unable to create invoice: %v", err)
@@ -505,6 +506,14 @@ func TestQueryInvoices(t *testing.T) {
 			},
 			expected: invoices,
 		},
+		// Fetch all invoices with a single query, reversed.
+		{
+			query: InvoiceQuery{
+				Reversed:       true,
+				NumMaxInvoices: numInvoices,
+			},
+			expected: invoices,
+		},
 		// Fetch the first 25 invoices.
 		{
 			query: InvoiceQuery{
@@ -529,6 +538,124 @@ func TestQueryInvoices(t *testing.T) {
 				NumMaxInvoices: numInvoices,
 			},
 			expected: invoices[10:],
+		},
+		// Fetch all but the first invoice.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    1,
+				NumMaxInvoices: numInvoices,
+			},
+			expected: invoices[1:],
+		},
+		// Fetch one invoice, reversed, with index offset 3. This
+		// should give us the second invoice in the array.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    3,
+				Reversed:       true,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[1:2],
+		},
+		// Same as above, at index 2.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    2,
+				Reversed:       true,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[0:1],
+		},
+		// Fetch one invoice, at index 1, reversed. Since invoice#1 is
+		// the very first, there won't be any left in a reverse search,
+		// so we expect no invoices to be returned.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    1,
+				Reversed:       true,
+				NumMaxInvoices: 1,
+			},
+			expected: nil,
+		},
+		// Same as above, but don't restrict the number of invoices to
+		// 1.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    1,
+				Reversed:       true,
+				NumMaxInvoices: numInvoices,
+			},
+			expected: nil,
+		},
+		// Fetch one invoice, reversed, with no offset set. We expect
+		// the last invoice in the response.
+		{
+			query: InvoiceQuery{
+				Reversed:       true,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[numInvoices-1:],
+		},
+		// Fetch one invoice, reversed, the offset set at numInvoices+1.
+		// We expect this to return the last invoice.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    numInvoices + 1,
+				Reversed:       true,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[numInvoices-1:],
+		},
+		// Same as above, at offset numInvoices.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    numInvoices,
+				Reversed:       true,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[numInvoices-2 : numInvoices-1],
+		},
+		// Fetch one invoice, at no offset (same as offset 0). We
+		// expect the first invoice only in the response.
+		{
+			query: InvoiceQuery{
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[:1],
+		},
+		// Same as above, at offset 1.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    1,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[1:2],
+		},
+		// Same as above, at offset 2.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    2,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[2:3],
+		},
+		// Same as above, at offset numInvoices-1. Expect the last
+		// invoice to be returned.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    numInvoices - 1,
+				NumMaxInvoices: 1,
+			},
+			expected: invoices[numInvoices-1:],
+		},
+		// Same as above, at offset numInvoices. No invoices should be
+		// returned, as there are no invoices after this offset.
+		{
+			query: InvoiceQuery{
+				IndexOffset:    numInvoices,
+				NumMaxInvoices: 1,
+			},
+			expected: nil,
 		},
 		// Fetch all pending invoices with a single query.
 		{

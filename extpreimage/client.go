@@ -17,26 +17,26 @@ type RPC interface {
 	NewClient(*grpc.ClientConn) ExternalPreimageServiceClient
 }
 
-// grpcRpc exposes the methods from the grpc package that we need
+// grpcRPC exposes the methods from the grpc package that we need
 // this allows us to stub out the grpc methods more easily
-type grpcRpc struct{}
+type grpcRPC struct{}
 
-func (r *grpcRpc) Dial(host string, opt grpc.DialOption) (*grpc.ClientConn,
+func (r *grpcRPC) Dial(host string, opt grpc.DialOption) (*grpc.ClientConn,
 	error) {
 	return grpc.Dial(host, opt)
 }
 
-func (r *grpcRpc) WithInsecure() grpc.DialOption {
+func (r *grpcRPC) WithInsecure() grpc.DialOption {
 	return grpc.WithInsecure()
 }
 
-func (r *grpcRpc) NewClient(c *grpc.ClientConn) ExternalPreimageServiceClient {
+func (r *grpcRPC) NewClient(c *grpc.ClientConn) ExternalPreimageServiceClient {
 	return NewExternalPreimageServiceClient(c)
 }
 
 // DefaultRPC exposes the default gRPC implementation for consumers
 func DefaultRPC() RPC {
-	return &grpcRpc{}
+	return &grpcRPC{}
 }
 
 // Client is the exposed interface for an extpreimage Client
@@ -136,6 +136,9 @@ func (c *client) symbol() (Symbol, error) {
 	return symbol, fmt.Errorf("extpreimage: Invalid chain name: %v", c.chain)
 }
 
+// PreimageRequest is a fully-formed request to retrieve a preimage stored on an
+// external system. It includes all of the relevant information in the associated
+// payment, including the PaymentHash, Amount, TimeLock, and current Block Height.
 type PreimageRequest struct {
 	PaymentHash [sha256.Size]byte
 	Amount      int64

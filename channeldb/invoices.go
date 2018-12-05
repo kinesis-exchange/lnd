@@ -528,9 +528,28 @@ func (d *DB) QueryInvoices(q InvoiceQuery) (InvoiceSlice, error) {
 		// our cursor depending on the parameters set within the query.
 		c := invoiceAddIndex.Cursor()
 		invoiceKey := keyForIndex(c, q.IndexOffset+1)
+
+		// If the query is specifying reverse iteration, then we must
+		// handle a few offset cases.
 		if q.Reversed {
-			_, invoiceKey = c.Last()
-			if q.IndexOffset != 0 {
+			switch q.IndexOffset {
+
+			// This indicates the default case, where no offset was
+			// specified. In that case we just start from the last
+			// invoice.
+			case 0:
+				_, invoiceKey = c.Last()
+
+			// This indicates the offset being set to the very
+			// first invoice. Since there are no invoices before
+			// this offset, and the direction is reversed, we can
+			// return without adding any invoices to the response.
+			case 1:
+				return nil
+
+			// Otherwise we start iteration at the invoice prior to
+			// the offset.
+			default:
 				invoiceKey = keyForIndex(c, q.IndexOffset-1)
 			}
 		}
@@ -622,7 +641,6 @@ func (d *DB) SettleInvoice(paymentHash [32]byte,
 		if invoiceNum == nil {
 			return ErrInvoiceNotFound
 		}
-
 		invoice, err := settleInvoice(
 			invoices, settleIndex, invoiceNum, amtPaid,
 		)
@@ -640,7 +658,7 @@ func (d *DB) SettleInvoice(paymentHash [32]byte,
 	return settledInvoice, nil
 }
 
-// addInvoicePreimage attempts to update an invoice with an External Preimage
+// AddInvoicePreimage attempts to update an invoice with an External Preimage
 // to save that preimage locally, allowing us to re-use it for duplicate
 // payments and provide it to listeners via LookupInvoice. If an invoice
 // matching this hash does not exist, it will fail with a "not found" error.
@@ -651,7 +669,9 @@ func (d *DB) AddInvoicePreimage(paymentHash [32]byte,
 		if err != nil {
 			return err
 		}
-		invoiceIndex, err := invoices.CreateBucketIfNotExists(invoiceIndexBucket)
+		invoiceIndex, err := invoices.CreateBucketIfNotExists(
+			invoiceIndexBucket,
+		)
 		if err != nil {
 			return err
 		}
@@ -721,6 +741,7 @@ func (d *DB) InvoicesSettledSince(sinceSettleIndex uint64) ([]Invoice, error) {
 
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}

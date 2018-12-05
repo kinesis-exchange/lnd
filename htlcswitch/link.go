@@ -37,6 +37,17 @@ const (
 	// TODO(roasbeef): must be < default delta
 	expiryGraceDelta = 2
 
+	// maxCltvExpiry is the maximum outgoing time lock that the node accepts
+	// for forwarded payments. The value is relative to the current block
+	// height. The reason to have a maximum is to prevent funds getting
+	// locked up unreasonably long. Otherwise, an attacker willing to lock
+	// its own funds too, could force the funds of this node to be locked up
+	// for an indefinite (max int32) number of blocks.
+	//
+	// The value 5000 is based on the maximum number of hops (20), the
+	// default cltv delta (144) and some extra margin.
+	maxCltvExpiry = 5000
+
 	// DefaultMinLinkFeeUpdateTimeout represents the minimum interval in
 	// which a link should propose to update its commitment fee rate.
 	DefaultMinLinkFeeUpdateTimeout = 10 * time.Minute
@@ -510,7 +521,7 @@ func (l *channelLink) syncChanStates() error {
 	// First, we'll generate our ChanSync message to send to the other
 	// side. Based on this message, the remote party will decide if they
 	// need to retransmit any data or not.
-	localChanSyncMsg, err := l.channel.ChanSyncMsg()
+	localChanSyncMsg, err := lnwallet.ChanSyncMsg(l.channel.State())
 	if err != nil {
 		return fmt.Errorf("unable to generate chan sync message for "+
 			"ChannelPoint(%v)", l.channel.ChannelPoint())
@@ -1953,6 +1964,14 @@ func (l *channelLink) HtlcSatifiesPolicy(payHash [32]byte,
 		}
 
 		return failure
+	}
+
+	if outgoingTimeout-heightNow > maxCltvExpiry {
+		l.errorf("outgoing htlc(%x) has a time lock too far in the "+
+			"future: got %v, but maximum is %v", payHash[:],
+			outgoingTimeout-heightNow, maxCltvExpiry)
+
+		return &lnwire.FailExpiryTooFar{}
 	}
 
 	// Finally, we'll ensure that the time-lock on the outgoing HTLC meets
