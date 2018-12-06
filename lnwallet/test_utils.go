@@ -518,6 +518,8 @@ func (m *mockPreimageCache) AddPreimage(preimage []byte) error {
 	return nil
 }
 
+func (m *mockPreimageCache) Stop() {}
+
 // pubkeyFromHex parses a Bitcoin public key from a hex encoded string.
 func pubkeyFromHex(keyHex string) (*btcec.PublicKey, error) {
 	bytes, err := hex.DecodeString(keyHex)
