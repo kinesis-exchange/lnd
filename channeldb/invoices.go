@@ -172,33 +172,6 @@ type Invoice struct {
 	AmtPaid lnwire.MilliSatoshi
 }
 
-// getPaymentHash retrieves the payment hash for a given invoice,
-// either by calculating it from the preimage, or using the given
-// hash for invoices with external preimages.
-func getPaymentHash(i *Invoice) ([32]byte, error) {
-	var paymentHash [32]byte
-
-	if i.Terms.ExternalPreimage {
-		if bytes.Equal(i.Terms.PaymentHash[:], zeroHash[:]) {
-			return zeroHash, fmt.Errorf("Invoices with ExternalPreimage must " +
-				"have a locally defined PaymentHash.")
-		}
-
-		// For external preimages, we rely on a provided hash
-		paymentHash = i.Terms.PaymentHash
-	} else {
-		if bytes.Equal(i.Terms.PaymentPreimage[:], zeroPreimage[:]) {
-			return zeroHash, fmt.Errorf("Invoices must have a preimage or" +
-				"use ExternalPreimages")
-		}
-
-		// For local preimages, we calculate the hash ourselves
-		paymentHash = sha256.Sum256(i.Terms.PaymentPreimage[:])
-	}
-
-	return paymentHash, nil
-}
-
 func validateInvoice(i *Invoice) error {
 	if len(i.Memo) > MaxMemoSize {
 		return fmt.Errorf("max length a memo is %v, and invoice "+
@@ -246,7 +219,7 @@ func (d *DB) AddInvoice(newInvoice *Invoice) (uint64, error) {
 			return err
 		}
 
-		paymentHash, err := getPaymentHash(newInvoice)
+		paymentHash, err := newInvoice.Terms.GetPaymentHash()
 		if err != nil {
 			return err
 		}
@@ -766,7 +739,7 @@ func putInvoice(invoices, invoiceIndex, addIndex *bolt.Bucket,
 		return 0, err
 	}
 
-	paymentHash, err := getPaymentHash(i)
+	paymentHash, err := i.Terms.GetPaymentHash()
 	if err != nil {
 		return 0, err
 	}
@@ -848,7 +821,7 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 
 	var paymentHash [sha256.Size]byte
 	if i.Terms.ExternalPreimage {
-		paymentHash, err = getPaymentHash(i)
+		paymentHash, err = i.Terms.GetPaymentHash()
 		if err != nil {
 			return err
 		}

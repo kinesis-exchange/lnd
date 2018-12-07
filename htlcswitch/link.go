@@ -2441,71 +2441,29 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 				continue
 			}
 
-			var zeroPreimage [32]byte
-			var preimage [32]byte
+			preimage, tempErr, permErr := invoice.Terms.GetPaymentPreimage(
+				pd.Timeout, heightNow, l.cfg.ExtpreimageClient, l.cfg.Registry)
 
-			switch {
-			// if there is a local preimage available, we should use it to settle the
-			// invoice
-			case !bytes.Equal(invoice.Terms.PaymentPreimage[:], zeroPreimage[:]):
-				preimage = invoice.Terms.PaymentPreimage
-			// if this is an invoice with an external preimage, we should retrieve it.
-			case invoice.Terms.ExternalPreimage:
-				if l.cfg.ExtpreimageClient == nil {
-					l.fail(LinkFailureError{code: ErrInternalError},
-						"no extpreimage client configured")
-					return false
-				}
-
-				preimageRequest := &extpreimage.PreimageRequest{
-					PaymentHash: invoice.Terms.PaymentHash,
-					Amount:      int64(invoice.Terms.Value.ToSatoshis()),
-					TimeLock:    pd.Timeout,
-					BestHeight:  heightNow,
-				}
-
-				var tempErr error
-				var permErr error
-				preimage, tempErr, permErr =
-					l.cfg.ExtpreimageClient.Retrieve(preimageRequest)
-
-				if tempErr != nil {
-					l.fail(LinkFailureError{code: ErrInternalError},
-						"unable to retrieve external invoice: %v", tempErr)
-					return false
-				}
-
-				if permErr != nil {
-					log.Errorf("permanent error while retrieving external invoice: "+
-						"%v", permErr)
-
-					// we categorize all failures to retrieve external invoice preimages
-					// as unknown payment hashes since that's the most accurate for
-					// the protocol.
-					failure := lnwire.FailUnknownPaymentHash{}
-					l.sendHTLCError(
-						pd.HtlcIndex, failure, obfuscator, pd.SourceRef,
-					)
-
-					needUpdate = true
-					continue
-				}
-
-				// we should persist the preimage locally before settling the
-				// invoice so that it can be used as a normal invoice once it
-				// is settled, and used for any duplicate payments without
-				// making another request to the external preimage service.
-				err = l.cfg.Registry.AddInvoicePreimage(invoiceHash, preimage)
-				if err != nil {
-					// TODO: should this fail the link or just log internally?
-					l.fail(LinkFailureError{code: ErrInternalError},
-						"unable to persist retrieved preimage: %v", err)
-					return false
-				}
-			default:
+			if tempErr != nil {
 				l.fail(LinkFailureError{code: ErrInternalError},
-					"no preimage available on invoice")
+					"unable to retrieve external invoice: %v", tempErr)
 				return false
+			}
+
+			if permErr != nil {
+				log.Errorf("permanent error while retrieving external invoice: "+
+					"%v", permErr)
+
+				// we categorize all failures to retrieve external invoice preimages
+				// as unknown payment hashes since that's the most accurate for
+				// the protocol.
+				failure := lnwire.FailUnknownPaymentHash{}
+				l.sendHTLCError(
+					pd.HtlcIndex, failure, obfuscator, pd.SourceRef,
+				)
+
+				needUpdate = true
+				continue
 			}
 
 			err = l.channel.SettleHTLC(
