@@ -2441,8 +2441,7 @@ func (l *channelLink) processRemoteAdds(fwdPkg *channeldb.FwdPkg,
 				continue
 			}
 
-			extpreimageInvoice := extpreimage.Invoice(invoice.Terms)
-			preimage, tempErr, permErr := extpreimageInvoice.GetPaymentPreimage(
+			preimage, tempErr, permErr := invoice.Terms.GetPaymentPreimage(
 				pd.Timeout, heightNow, l.cfg.ExtpreimageClient, l.cfg.Registry)
 
 			if tempErr != nil {

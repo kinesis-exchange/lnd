@@ -10,7 +10,6 @@ import (
 
 	"github.com/btcsuite/btcd/wire"
 	"github.com/coreos/bbolt"
-	"github.com/lightningnetwork/lnd/extpreimage"
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
@@ -220,8 +219,7 @@ func (d *DB) AddInvoice(newInvoice *Invoice) (uint64, error) {
 			return err
 		}
 
-		extpreimageInvoice := extpreimage.Invoice(newInvoice.Terms)
-		paymentHash, err := extpreimageInvoice.GetPaymentHash()
+		paymentHash, err := newInvoice.Terms.GetPaymentHash()
 		if err != nil {
 			return err
 		}
@@ -741,8 +739,7 @@ func putInvoice(invoices, invoiceIndex, addIndex *bolt.Bucket,
 		return 0, err
 	}
 
-	extpreimageInvoice := extpreimage.Invoice(i.Terms)
-	paymentHash, err := extpreimageInvoice.GetPaymentHash()
+	paymentHash, err := i.Terms.GetPaymentHash()
 	if err != nil {
 		return 0, err
 	}
@@ -824,8 +821,7 @@ func serializeInvoice(w io.Writer, i *Invoice) error {
 
 	var paymentHash [sha256.Size]byte
 	if i.Terms.ExternalPreimage {
-		extpreimageInvoice := extpreimage.Invoice(i.Terms)
-		paymentHash, err = extpreimageInvoice.GetPaymentHash()
+		paymentHash, err = i.Terms.GetPaymentHash()
 		if err != nil {
 			return err
 		}
