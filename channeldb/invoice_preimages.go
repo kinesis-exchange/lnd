@@ -9,6 +9,16 @@ import (
   "github.com/lightningnetwork/lnd/extpreimage"
 )
 
+// InvoiceTerm is an interface defining terms that can be
+// used to retrieve hashes and preimages. It is the interface
+// implemented by channeldb.ContractTerm. It is defined as
+// an interface so that it can be stubbed for testing.
+type InvoiceTerm interface {
+  GetPaymentHash() ([32]byte, error)
+  GetPaymentPreimage(uint32, uint32, extpreimage.Client, InvoiceRegistry) (
+    [32]byte, TempPreimageError, PermPreimageError)
+}
+
 // InvoiceRegistry is a registry for storing invoices. It is a
 // simplified interface of htlcswitch.InvoiceDatabase for use
 // in this package.
@@ -16,17 +26,17 @@ type InvoiceRegistry interface {
   AddInvoicePreimage(chainhash.Hash, [32]byte) error
 }
 
-// tempPreimageError is an error encountered while retrieving
+// TempPreimageError is an error encountered while retrieving
 // a preimage which is temporary - we may be able to eventually
 // recover the preimage, but it is in an unknown state.
-type tempPreimageError interface {
+type TempPreimageError interface {
   Error() string
 }
 
-// permPreimageError is an error encountered while retrieving
+// PermPreimageError is an error encountered while retrieving
 // a preimage which is permanent - we should never expect to recover
 // the preimage.
-type permPreimageError interface {
+type PermPreimageError interface {
   Error() string
 }
 
@@ -66,7 +76,7 @@ func (c *ContractTerm) GetPaymentHash() ([32]byte, error) {
 // invoice.
 func (c *ContractTerm) GetPaymentPreimage(timeLock uint32, currentHeight uint32,
   client extpreimage.Client, registry InvoiceRegistry) (
-    [32]byte, tempPreimageError, permPreimageError) {
+    [32]byte, TempPreimageError, PermPreimageError) {
 
   var zeroPreimage [32]byte
 

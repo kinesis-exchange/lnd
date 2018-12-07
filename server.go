@@ -299,12 +299,6 @@ func newServer(listenAddrs []net.Addr, chanDB *channeldb.DB, cc *chainControl,
 		quit: make(chan struct{}),
 	}
 
-	s.witnessBeacon = &preimageBeacon{
-		invoices:    s.invoices,
-		wCache:      chanDB.NewWitnessCache(),
-		subscribers: make(map[uint64]*preimageSubscriber),
-	}
-
 	// Set up the External Preimage client if one is set to
 	// allow us to query for preimages from the external service
 	if cfg.Extpreimage.RPCHost != "" {
@@ -316,6 +310,13 @@ func newServer(listenAddrs []net.Addr, chanDB *channeldb.DB, cc *chainControl,
 			srvrLog.Errorf("Could not create extpreimageClient: %v", err)
 			return nil, err
 		}
+	}
+
+	s.witnessBeacon = &preimageBeacon{
+		extpreimageClient: s.extpreimageClient,
+		invoices:          s.invoices,
+		wCache:            chanDB.NewWitnessCache(),
+		subscribers:       make(map[uint64]*preimageSubscriber),
 	}
 
 	// If the debug HTLC flag is on, then we invoice a "master debug"

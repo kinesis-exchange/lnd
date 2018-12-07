@@ -6,6 +6,8 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightningnetwork/lnd/channeldb"
 	"github.com/lightningnetwork/lnd/contractcourt"
+	"github.com/lightningnetwork/lnd/extpreimage"
+	"github.com/lightningnetwork/lnd/htlcswitch"
 	"github.com/lightningnetwork/lnd/lnwallet"
 )
 
@@ -23,7 +25,9 @@ type preimageSubscriber struct {
 type preimageBeacon struct {
 	sync.RWMutex
 
-	invoices *invoiceRegistry
+	extpreimageClient extpreimage.Client
+
+	invoices htlcswitch.InvoiceDatabase
 
 	wCache *channeldb.WitnessCache
 
@@ -63,6 +67,14 @@ func (p *preimageBeacon) SubscribeUpdates() *contractcourt.WitnessSubscription {
 	}
 }
 
+// castInvoiceTerm converts a standard Invoice into one that
+// can be used for retrieving preimages. We do this purely so that
+// we can stub invoices for testing.
+var castInvoiceTerm = func(i channeldb.Invoice) channeldb.InvoiceTerm {
+	invoiceTerm := i.Terms
+	return &invoiceTerm
+}
+
 // LookupPreImage attempts to lookup a preimage in the global cache.  True is
 // returned for the second argument if the preimage is found.
 func (p *preimageBeacon) LookupPreimage(payHash []byte) ([]byte, bool) {
@@ -85,7 +97,28 @@ func (p *preimageBeacon) LookupPreimage(payHash []byte) ([]byte, bool) {
 	// If we've found the invoice, then we can return the preimage
 	// directly.
 	if err != channeldb.ErrInvoiceNotFound {
-		return invoice.Terms.PaymentPreimage[:], true
+		// We get the preimage from the invoice, either using a local preimage
+		// if it's available,  or an external preimage if it's not. Note that
+		// we are using zero values for both the HTLC expiry and current block height:
+		// this is because we care only about external preimages that are readily
+		// available, not those that need to be requested further.
+		invoiceTerm := castInvoiceTerm(invoice)
+		preimage, tempErr, permErr := invoiceTerm.GetPaymentPreimage(
+			uint32(0), uint32(0), p.extpreimageClient, p.invoices)
+
+		if permErr != nil {
+			ltndLog.Errorf("permanent error while retrieving invoice "+
+				"preimage: %v", permErr)
+			return nil, false
+		}
+
+		if tempErr != nil {
+			ltndLog.Errorf("temporary error while retrieving invoice "+
+				"preimage: %v", tempErr)
+			return nil, false
+		}
+
+		return preimage[:], true
 	}
 
 	// Otherwise, we'll perform a final check using the witness cache.
