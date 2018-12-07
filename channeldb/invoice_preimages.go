@@ -16,6 +16,21 @@ type InvoiceRegistry interface {
   AddInvoicePreimage(chainhash.Hash, [32]byte) error
 }
 
+// tempPreimageError is an error encountered while retrieving
+// a preimage which is temporary - we may be able to eventually
+// recover the preimage, but it is in an unknown state.
+type tempPreimageError interface {
+  Error() string
+}
+
+// permPreimageError is an error encountered while retrieving
+// a preimage which is permanent - we should never expect to recover
+// the preimage.
+type permPreimageError interface {
+  Error() string
+}
+
+
 // GetPaymentHash retrieves the payment hash for a given invoice,
 // either by calculating it from the preimage, or using the given
 // hash for invoices with external preimages.
@@ -50,7 +65,9 @@ func (c *ContractTerm) GetPaymentHash() ([32]byte, error) {
 // it from the external preimage service if it is an external preimage
 // invoice.
 func (c *ContractTerm) GetPaymentPreimage(timeLock uint32, currentHeight uint32,
-  client extpreimage.Client, registry InvoiceRegistry) ([32]byte, error, error) {
+  client extpreimage.Client, registry InvoiceRegistry) (
+    [32]byte, tempPreimageError, permPreimageError) {
+
   var zeroPreimage [32]byte
 
   switch {
