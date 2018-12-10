@@ -57,8 +57,9 @@ type WitnessBeacon interface {
 	// AddPreImage adds a newly discovered preimage to the global cache.
 	AddPreimage(pre []byte) error
 
-	// Stop shuts down the witness beacon.
-	Stop()
+	// PollForPreimage polls for external preimages that we were not able to
+	// find yet.
+	PollForPreimage([]byte) bool
 }
 
 // ChannelArbitratorConfig contains all the functionality that the

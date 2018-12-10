@@ -1068,9 +1068,6 @@ func (s *server) Stop() error {
 	s.invoices.Stop()
 	s.fundingMgr.Stop()
 
-	// stop the witness beacon so we can stop polling for preimages.
-	s.witnessBeacon.Stop()
-
 	// If the extpreimage service was set up, we need to shutdown
 	// any outstanding connections to it.
 	if s.extpreimageClient != nil {

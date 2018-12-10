@@ -2,7 +2,6 @@ package main
 
 import (
 	"sync"
-	"time"
 
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -41,21 +40,6 @@ type preimageBeacon struct {
 
 	clientCounter uint64
 	subscribers   map[uint64]*preimageSubscriber
-
-	pollCounter uint64
-	polls       map[uint64](chan bool)
-}
-
-// Stop shuts down the preimage beacon by quitting
-// all currently active polls.
-func (p *preimageBeacon) Stop() {
-	if p.polls == nil {
-		p.polls = make(map[uint64](chan bool))
-	}
-	for _, quit := range p.polls {
-		quit <- true
-	}
-	p.polls = make(map[uint64](chan bool))
 }
 
 // SubscribeUpdates returns a channel that will be sent upon *each* time a new
@@ -138,10 +122,6 @@ func (p *preimageBeacon) LookupPreimage(payHash []byte) ([]byte, bool) {
 		if tempErr != nil {
 			ltndLog.Errorf("temporary error while retrieving invoice "+
 				"preimage: %v", tempErr)
-			ltndLog.Debugf("initiating polling to retrieve preimage "+
-				"for payment hash: %v", payHash)
-
-			go p.pollExtpreimage(invoiceTerm, 10*time.Second)
 			return nil, false
 		}
 
@@ -160,56 +140,49 @@ func (p *preimageBeacon) LookupPreimage(payHash []byte) ([]byte, bool) {
 	return preimage, true
 }
 
-func (p *preimageBeacon) pollExtpreimage(i channeldb.InvoiceTerm,
-	pollInterval time.Duration) {
-	// create a channel for us to be able to stop polling if the
-	// preimage beacon is quit.
-	if p.polls == nil {
-		p.polls = make(map[uint64](chan bool))
+// PollForPreimage attempts to lookup a preimage for a potentially
+// external preimage invoice. Once found, it adds the preimage to the
+// global cache. It returns whether the caller should continue to poll
+// or not.
+func (p *preimageBeacon) PollForPreimage(payHash []byte) bool {
+	keepPolling := true
+	stopPolling := false
+
+	// First, we'll check the invoice registry to see if we already know of
+	// the preimage as it's on that we created ourselves.
+	var invoiceKey chainhash.Hash
+	copy(invoiceKey[:], payHash)
+	invoice, _, err := p.invoices.LookupInvoice(invoiceKey)
+	switch {
+	case err == channeldb.ErrInvoiceNotFound:
+		return stopPolling
+	case err != nil:
+		return keepPolling
 	}
-	pollID := p.pollCounter
-	quit := make(chan bool)
-	p.polls[pollID] = quit
-	p.pollCounter++
-	defer func() {
-		delete(p.polls, pollID)
-		close(quit)
-	}()
 
-	ticker := time.NewTicker(pollInterval)
-	defer ticker.Stop()
+	invoiceTerm := castInvoiceTerm(invoice)
+	preimage, tempErr, permErr := invoiceTerm.GetPaymentPreimage(
+		uint32(0), uint32(0), p.extpreimageClient, p.invoices)
 
-	for {
-		select {
-		case <-ticker.C:
-			preimage, tempErr, permErr := i.GetPaymentPreimage(uint32(0), uint32(0),
-				p.extpreimageClient, p.invoices)
-
-			// permanent errors indicate we no longer need to poll for this
-			// preimage, we'll never retrieve it.
-			if permErr != nil {
-				ltndLog.Errorf("permanent error while polling for invoice "+
-					"preimage: %v, stopping poll.", permErr)
-				return
-			}
-
-			// if we encountered another temporary error, just continue to poll.
-			if tempErr != nil {
-				ltndLog.Errorf("temporary error while polling for invoice "+
-					"preimage: %v, continuing poll.", tempErr)
-				continue
-			}
-
-			// if we encountered no permanent or temporary errors, we have our
-			// preimage and we can add it to the cache and stop polling.
-			ltndLog.Debugf("retrieved preimage=%x while polling.", preimage[:])
-			p.AddPreimage(preimage[:])
-			return
-		case <-quit:
-			ltndLog.Tracef("preimage Beacon shutting down, stopping poll.")
-			return
-		}
+	if permErr != nil {
+		ltndLog.Errorf("permanent error while retrieving invoice "+
+			"preimage: %v", permErr)
+		return stopPolling
 	}
+
+	if tempErr != nil {
+		ltndLog.Errorf("temporary error while retrieving invoice "+
+			"preimage: %v", tempErr)
+		return keepPolling
+	}
+
+	// store the preimage in the witness cache before continuing
+	err = p.AddPreimage(preimage[:])
+	if err != nil {
+		return keepPolling
+	}
+
+	return stopPolling
 }
 
 // AddPreImage adds a newly discovered preimage to the global cache, and also
