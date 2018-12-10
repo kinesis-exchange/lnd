@@ -19,6 +19,13 @@ type preimageSubscriber struct {
 	quit chan struct{}
 }
 
+// witnessCache is an interface describing the subset of channeldb.WitnessCache
+// used by the witness beacon.
+type witnessCache interface {
+	LookupWitness(channeldb.WitnessType, []byte) ([]byte, error)
+	AddWitness(channeldb.WitnessType, []byte) error
+}
+
 // preimageBeacon is an implementation of the contractcourt.WitnessBeacon
 // interface, and the lnwallet.PreimageCache interface. This implementation is
 // concerned with a single witness type: sha256 hahsh preimages.
@@ -29,7 +36,7 @@ type preimageBeacon struct {
 
 	invoices htlcswitch.InvoiceDatabase
 
-	wCache *channeldb.WitnessCache
+	wCache witnessCache
 
 	clientCounter uint64
 	subscribers   map[uint64]*preimageSubscriber
@@ -131,6 +138,51 @@ func (p *preimageBeacon) LookupPreimage(payHash []byte) ([]byte, bool) {
 	}
 
 	return preimage, true
+}
+
+// PollForPreimage attempts to lookup a preimage for a potentially
+// external preimage invoice. Once found, it adds the preimage to the
+// global cache. It returns whether the caller should continue to poll
+// or not.
+func (p *preimageBeacon) PollForPreimage(payHash []byte) bool {
+	keepPolling := true
+	stopPolling := false
+
+	// First, we'll check the invoice registry to see if we already know of
+	// the preimage as it's on that we created ourselves.
+	var invoiceKey chainhash.Hash
+	copy(invoiceKey[:], payHash)
+	invoice, _, err := p.invoices.LookupInvoice(invoiceKey)
+	switch {
+	case err == channeldb.ErrInvoiceNotFound:
+		return stopPolling
+	case err != nil:
+		return keepPolling
+	}
+
+	invoiceTerm := castInvoiceTerm(invoice)
+	preimage, tempErr, permErr := invoiceTerm.GetPaymentPreimage(
+		uint32(0), uint32(0), p.extpreimageClient, p.invoices)
+
+	if permErr != nil {
+		ltndLog.Errorf("permanent error while retrieving invoice "+
+			"preimage: %v", permErr)
+		return stopPolling
+	}
+
+	if tempErr != nil {
+		ltndLog.Errorf("temporary error while retrieving invoice "+
+			"preimage: %v", tempErr)
+		return keepPolling
+	}
+
+	// store the preimage in the witness cache before continuing
+	err = p.AddPreimage(preimage[:])
+	if err != nil {
+		return keepPolling
+	}
+
+	return stopPolling
 }
 
 // AddPreImage adds a newly discovered preimage to the global cache, and also

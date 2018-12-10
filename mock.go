@@ -321,3 +321,7 @@ func (m *mockPreimageCache) AddPreimage(preimage []byte) error {
 
 	return nil
 }
+
+func (m *mockPreimageCache) PollForPreimage(hash []byte) bool {
+	return false
+}
