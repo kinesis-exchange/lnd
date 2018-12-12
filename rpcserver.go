@@ -2300,15 +2300,6 @@ func (r *rpcServer) dispatchPaymentIntent(
 		}, nil
 	}
 
-	// If a route was used to complete this payment, then we'll need to
-	// compute the final amount sent
-	var amt lnwire.MilliSatoshi
-	if len(payIntent.routes) > 0 {
-		amt = route.TotalAmount - route.TotalFees
-	} else {
-		amt = payIntent.msat
-	}
-
 	return &paymentIntentResponse{
 		Route:    route,
 		Preimage: preImage,

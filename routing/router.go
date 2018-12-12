@@ -1660,7 +1660,7 @@ func (r *ChannelRouter) sendPayment(payment *LightningPayment,
 
 	// We save the payment in the database before attempting any payments
 	// so that we will have a record of its' existence despite the outcome.
-	err := r.savePayment(payment)
+	err = r.savePayment(payment)
 	if err != nil {
 		return preImage, nil, err
 	}
@@ -1728,7 +1728,7 @@ func (r *ChannelRouter) sendPayment(payment *LightningPayment,
 
 		// Update the payment's route so that if it succeeds
 		// we know what path it took and what the fees were.
-		err := r.addPaymentRoute(payment, route)
+		err = r.addPaymentRoute(payment, route)
 		if err != nil {
 			return preImage, nil, err
 		}
@@ -2012,7 +2012,7 @@ func (r *ChannelRouter) sendPayment(payment *LightningPayment,
 // savePayment saves a payment before any attempts have taken place
 // in the router.
 func (r *ChannelRouter) savePayment(payment *LightningPayment) error {
-	return r.cfg.DB.AddPayment(payment.paymentHash, payment.Amount)
+	return r.cfg.DB.AddPayment(payment.PaymentHash, payment.Amount)
 }
 
 // addPaymentRoute updates an existing payment with a particular route
@@ -2026,13 +2026,13 @@ func (r *ChannelRouter) addPaymentRoute(payment *LightningPayment,
 		copy(paymentPath[i][:], hopPub[:])
 	}
 
-	r := &channeldb.OutgoingPaymentRoute{
+	outgoingRoute := &channeldb.OutgoingPaymentRoute{
 		Path:           paymentPath,
 		Fee:            route.TotalFees,
 		TimeLockLength: route.TotalTimeLock,
 	}
 
-	return r.cfg.DB.UpdatePaymentRoute(payment.PaymentHash, r)
+	return r.cfg.DB.UpdatePaymentRoute(payment.PaymentHash, outgoingRoute)
 }
 
 // pruneVertexFailure will attempt to prune a vertex from the current available
