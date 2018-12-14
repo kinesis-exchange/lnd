@@ -442,6 +442,13 @@ func paymentStatusesMigration(tx *bolt.Tx) error {
 			return err
 		}
 
+		var zeroPreimage [32]byte
+		if bytes.Equal(payment.PaymentPreimage[:], zeroPreimage[:]) {
+			// ignore payments without preimages, as these are
+			// not considered complete
+			return nil
+		}
+
 		// Calculate payment hash for current payment.
 		paymentHash := sha256.Sum256(payment.PaymentPreimage[:])
 

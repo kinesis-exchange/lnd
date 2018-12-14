@@ -30,6 +30,9 @@ var (
 	// paymentStatusBucket is the name of the bucket within the database that
 	// stores the status of a payment indexed by the payment's preimage.
 	paymentStatusBucket = []byte("payment-status")
+
+	// now is a replacement for time.Now to allow us to stub it for testing
+	now = time.Now
 )
 
 // PaymentStatus represent current status of payment
@@ -127,7 +130,7 @@ func (db *DB) AddPayment(paymentHash [32]byte,
 			Terms: ContractTerm{
 				Value: amount,
 			},
-			CreationDate: time.Now(),
+			CreationDate: now(),
 		},
 	}
 
