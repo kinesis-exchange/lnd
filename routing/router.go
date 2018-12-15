@@ -142,13 +142,21 @@ type ChannelPolicy struct {
 	TimeLockDelta uint32
 }
 
+// paymentDB is the interface implemented by channeldb for storing
+// payments when they are initated in the router.
+type paymentDB interface {
+	AddPayment(paymentHash [32]byte, amount lnwire.MilliSatoshi) error
+	UpdatePaymentRoute(paymentHash [32]byte,
+		route *channeldb.OutgoingPaymentRoute) error
+}
+
 // Config defines the configuration for the ChannelRouter. ALL elements within
 // the configuration MUST be non-nil for the ChannelRouter to carry out its
 // duties.
 type Config struct {
 	// DB is the database that the ChannelRouter will use to store
 	// payments when they are initiated.
-	DB *channeldb.DB
+	DB paymentDB
 
 	// Graph is the channel graph that the ChannelRouter will use to gather
 	// metrics from and also to carry out path finding queries.
