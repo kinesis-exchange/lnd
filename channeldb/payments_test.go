@@ -2,6 +2,7 @@ package channeldb
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"fmt"
 	"math/rand"
 	"reflect"
@@ -12,31 +13,45 @@ import (
 	"github.com/lightningnetwork/lnd/lnwire"
 )
 
+var testTime time.Time
+
+func stubTime() {
+	// stub time.Now so that we can have a consistent time in our tests
+	testTime = time.Unix(time.Now().Unix(), 0)
+	now = func() time.Time { return testTime }
+}
+
+func unstubTime() {
+	now = time.Now
+}
+
 func makeFakePayment() *OutgoingPayment {
 	fakeInvoice := &Invoice{
-		// Use single second precision to avoid false positive test
-		// failures due to the monotonic time component.
-		CreationDate:   time.Unix(time.Now().Unix(), 0),
-		Memo:           []byte("fake memo"),
-		Receipt:        []byte("fake receipt"),
+		CreationDate:   testTime,
+		Memo:           []byte(""),
+		Receipt:        []byte(""),
 		PaymentRequest: []byte(""),
 	}
 
-	copy(fakeInvoice.Terms.PaymentPreimage[:], rev[:])
 	fakeInvoice.Terms.Value = lnwire.NewMSatFromSatoshis(10000)
 
-	fakePath := make([][33]byte, 3)
-	for i := 0; i < 3; i++ {
-		copy(fakePath[i][:], bytes.Repeat([]byte{byte(i)}, 33))
-	}
-
 	fakePayment := &OutgoingPayment{
-		Invoice:        *fakeInvoice,
-		Fee:            101,
-		Path:           fakePath,
-		TimeLockLength: 1000,
+		Invoice: *fakeInvoice,
 	}
+	fakePayment.Path = make([][33]byte, 0)
+	return fakePayment
+}
+
+func makeCompleteFakePayment() *OutgoingPayment {
+	fakePayment := makeFakePayment()
+	fakePaymentRoute := makeFakePaymentRoute()
+
+	fakePayment.Fee = fakePaymentRoute.Fee
+	fakePayment.Path = fakePaymentRoute.Path
+	fakePayment.TimeLockLength = fakePaymentRoute.TimeLockLength
+
 	copy(fakePayment.PaymentPreimage[:], rev[:])
+
 	return fakePayment
 }
 
@@ -46,6 +61,19 @@ func makeFakePaymentHash() [32]byte {
 	copy(paymentHash[:], rBytes)
 
 	return paymentHash
+}
+
+func makeFakePaymentRoute() *OutgoingPaymentRoute {
+	fakePath := make([][33]byte, 3)
+	for i := 0; i < 3; i++ {
+		copy(fakePath[i][:], bytes.Repeat([]byte{byte(i)}, 33))
+	}
+
+	return &OutgoingPaymentRoute{
+		Fee:            101,
+		Path:           fakePath,
+		TimeLockLength: 1000,
+	}
 }
 
 // randomBytes creates random []byte with length in range [minLen, maxLen)
@@ -61,33 +89,27 @@ func randomBytes(minLen, maxLen int) ([]byte, error) {
 }
 
 func makeRandomFakePayment() (*OutgoingPayment, error) {
-	var err error
 	fakeInvoice := &Invoice{
 		// Use single second precision to avoid false positive test
 		// failures due to the monotonic time component.
-		CreationDate: time.Unix(time.Now().Unix(), 0),
+		CreationDate:   testTime,
+		Memo:           []byte(""),
+		Receipt:        []byte(""),
+		PaymentRequest: []byte(""),
 	}
-
-	fakeInvoice.Memo, err = randomBytes(1, 50)
-	if err != nil {
-		return nil, err
-	}
-
-	fakeInvoice.Receipt, err = randomBytes(1, 50)
-	if err != nil {
-		return nil, err
-	}
-
-	fakeInvoice.PaymentRequest = []byte("")
-
-	preImg, err := randomBytes(32, 33)
-	if err != nil {
-		return nil, err
-	}
-	copy(fakeInvoice.Terms.PaymentPreimage[:], preImg)
 
 	fakeInvoice.Terms.Value = lnwire.MilliSatoshi(rand.Intn(10000))
 
+	fakePayment := &OutgoingPayment{
+		Invoice: *fakeInvoice,
+	}
+
+	fakePayment.Path = make([][33]byte, 0)
+
+	return fakePayment, nil
+}
+
+func makeRandomFakePaymentRoute() (*OutgoingPaymentRoute, error) {
 	fakePathLen := 1 + rand.Intn(5)
 	fakePath := make([][33]byte, fakePathLen)
 	for i := 0; i < fakePathLen; i++ {
@@ -98,21 +120,17 @@ func makeRandomFakePayment() (*OutgoingPayment, error) {
 		copy(fakePath[i][:], b)
 	}
 
-	fakePayment := &OutgoingPayment{
-		Invoice:        *fakeInvoice,
+	return &OutgoingPaymentRoute{
 		Fee:            lnwire.MilliSatoshi(rand.Intn(1001)),
 		Path:           fakePath,
 		TimeLockLength: uint32(rand.Intn(10000)),
-	}
-	copy(fakePayment.PaymentPreimage[:], fakeInvoice.Terms.PaymentPreimage[:])
-
-	return fakePayment, nil
+	}, nil
 }
 
 func TestOutgoingPaymentSerialization(t *testing.T) {
 	t.Parallel()
 
-	fakePayment := makeFakePayment()
+	fakePayment := makeCompleteFakePayment()
 
 	var b bytes.Buffer
 	if err := serializeOutgoingPayment(&b, fakePayment); err != nil {
@@ -133,8 +151,10 @@ func TestOutgoingPaymentSerialization(t *testing.T) {
 	}
 }
 
-func TestOutgoingPaymentWorkflow(t *testing.T) {
+func TestAddPaymentWorkflow(t *testing.T) {
 	t.Parallel()
+	stubTime()
+	defer unstubTime()
 
 	db, cleanUp, err := makeTestDB()
 	defer cleanUp()
@@ -143,7 +163,9 @@ func TestOutgoingPaymentWorkflow(t *testing.T) {
 	}
 
 	fakePayment := makeFakePayment()
-	if err = db.AddPayment(fakePayment); err != nil {
+	fakePaymentHash := makeFakePaymentHash()
+	err = db.AddPayment(fakePaymentHash, fakePayment.Invoice.Terms.Value)
+	if err != nil {
 		t.Fatalf("unable to put payment in DB: %v", err)
 	}
 
@@ -154,7 +176,7 @@ func TestOutgoingPaymentWorkflow(t *testing.T) {
 
 	expectedPayments := []*OutgoingPayment{fakePayment}
 	if !reflect.DeepEqual(payments, expectedPayments) {
-		t.Fatalf("Wrong payments after reading from DB."+
+		t.Fatalf("Wrong payments after reading from DB. "+
 			"Got %v, want %v",
 			spew.Sdump(payments),
 			spew.Sdump(expectedPayments),
@@ -168,7 +190,10 @@ func TestOutgoingPaymentWorkflow(t *testing.T) {
 			t.Fatalf("Internal error in tests: %v", err)
 		}
 
-		if err = db.AddPayment(randomPayment); err != nil {
+		randomPaymentHash := makeFakePaymentHash()
+
+		err = db.AddPayment(randomPaymentHash, randomPayment.Invoice.Terms.Value)
+		if err != nil {
 			t.Fatalf("unable to put payment in DB: %v", err)
 		}
 
@@ -181,7 +206,7 @@ func TestOutgoingPaymentWorkflow(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(payments, expectedPayments) {
-		t.Fatalf("Wrong payments after reading from DB."+
+		t.Fatalf("Wrong payments after reading from DB. "+
 			"Got %v, want %v",
 			spew.Sdump(payments),
 			spew.Sdump(expectedPayments),
@@ -201,6 +226,140 @@ func TestOutgoingPaymentWorkflow(t *testing.T) {
 	if len(paymentsAfterDeletion) != 0 {
 		t.Fatalf("After deletion DB has %v payments, want %v",
 			len(paymentsAfterDeletion), 0)
+	}
+}
+
+func TestPaymentRouteWorkflow(t *testing.T) {
+	t.Parallel()
+	stubTime()
+	defer unstubTime()
+
+	db, cleanUp, err := makeTestDB()
+	defer cleanUp()
+	if err != nil {
+		t.Fatalf("unable to make test db: %v", err)
+	}
+
+	fakePayment := makeFakePayment()
+	fakePaymentHash := makeFakePaymentHash()
+	err = db.AddPayment(fakePaymentHash, fakePayment.Invoice.Terms.Value)
+	if err != nil {
+		t.Fatalf("unable to put payment in DB: %v", err)
+	}
+
+	fakePaymentRoute := makeFakePaymentRoute()
+	err = db.UpdatePaymentRoute(fakePaymentHash, fakePaymentRoute)
+	if err != nil {
+		t.Fatalf("unable to update payment route in DB: %v", err)
+	}
+
+	payments, err := db.FetchAllPayments()
+	if err != nil {
+		t.Fatalf("unable to fetch payments from DB: %v", err)
+	}
+
+	fakePayment.Path = fakePaymentRoute.Path
+	fakePayment.TimeLockLength = fakePaymentRoute.TimeLockLength
+	fakePayment.Fee = fakePaymentRoute.Fee
+
+	expectedPayments := []*OutgoingPayment{fakePayment}
+	if !reflect.DeepEqual(payments, expectedPayments) {
+		t.Fatalf("Wrong payments after reading from DB. "+
+			"Got %v, want %v",
+			spew.Sdump(payments),
+			spew.Sdump(expectedPayments),
+		)
+	}
+}
+
+func TestPaymentPreimageWorkflow(t *testing.T) {
+	t.Parallel()
+	stubTime()
+	defer unstubTime()
+
+	db, cleanUp, err := makeTestDB()
+	defer cleanUp()
+	if err != nil {
+		t.Fatalf("unable to make test db: %v", err)
+	}
+
+	fakePayment := makeFakePayment()
+	fakePaymentPreimage := makeFakePaymentHash()
+	fakePaymentHash := sha256.Sum256(fakePaymentPreimage[:])
+	err = db.AddPayment(fakePaymentHash, fakePayment.Invoice.Terms.Value)
+	if err != nil {
+		t.Fatalf("unable to put payment in DB: %v", err)
+	}
+
+	err = db.UpdatePaymentPreimage(fakePaymentPreimage)
+	if err != nil {
+		t.Fatalf("unable to update payment preimage: %v", err)
+	}
+
+	payments, err := db.FetchAllPayments()
+	if err != nil {
+		t.Fatalf("unable to fetch payments from DB: %v", err)
+	}
+
+	fakePayment.PaymentPreimage = fakePaymentPreimage
+
+	expectedPayments := []*OutgoingPayment{fakePayment}
+	if !reflect.DeepEqual(payments, expectedPayments) {
+		t.Fatalf("Wrong payments after reading from DB. "+
+			"Got %v, want %v",
+			spew.Sdump(payments),
+			spew.Sdump(expectedPayments),
+		)
+	}
+}
+
+func TestTotalPaymentWorkflow(t *testing.T) {
+	t.Parallel()
+	stubTime()
+	defer unstubTime()
+
+	db, cleanUp, err := makeTestDB()
+	defer cleanUp()
+	if err != nil {
+		t.Fatalf("unable to make test db: %v", err)
+	}
+
+	fakePayment := makeCompleteFakePayment()
+	fakePaymentHash := sha256.Sum256(fakePayment.PaymentPreimage[:])
+
+	err = db.AddPayment(fakePaymentHash, fakePayment.Invoice.Terms.Value)
+	if err != nil {
+		t.Fatalf("unable to put payment in DB: %v", err)
+	}
+
+	fakePaymentRoute := &OutgoingPaymentRoute{
+		Path:           fakePayment.Path,
+		Fee:            fakePayment.Fee,
+		TimeLockLength: fakePayment.TimeLockLength,
+	}
+
+	err = db.UpdatePaymentRoute(fakePaymentHash, fakePaymentRoute)
+	if err != nil {
+		t.Fatalf("unable to update payment route in DB: %v", err)
+	}
+
+	err = db.UpdatePaymentPreimage(fakePayment.PaymentPreimage)
+	if err != nil {
+		t.Fatalf("unable to update payment preimage: %v", err)
+	}
+
+	payments, err := db.FetchAllPayments()
+	if err != nil {
+		t.Fatalf("unable to fetch payments from DB: %v", err)
+	}
+
+	expectedPayments := []*OutgoingPayment{fakePayment}
+	if !reflect.DeepEqual(payments, expectedPayments) {
+		t.Fatalf("Wrong payments after reading from DB. "+
+			"Got %v, want %v",
+			spew.Sdump(payments),
+			spew.Sdump(expectedPayments),
+		)
 	}
 }
 
@@ -243,7 +402,7 @@ func TestPaymentStatusWorkflow(t *testing.T) {
 		}
 
 		if status != testCase.status {
-			t.Fatalf("Wrong payments status after reading from DB."+
+			t.Fatalf("Wrong payments status after reading from DB. "+
 				"Got %v, want %v",
 				spew.Sdump(status),
 				spew.Sdump(testCase.status),

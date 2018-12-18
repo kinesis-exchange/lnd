@@ -1,6 +1,7 @@
 package htlcswitch
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
@@ -1739,6 +1740,139 @@ func TestSwitchSendPayment(t *testing.T) {
 
 	if s.numPendingPayments() != 0 {
 		t.Fatal("wrong amount of pending payments")
+	}
+}
+
+// TestLocalPaymentPreimageSaved tests that if we send a series of locally
+// initiated payments, their preimages are saved in the databse.
+func TestLocalPaymentPreimageSaved(t *testing.T) {
+	t.Parallel()
+
+	alicePeer, err := newMockServer(t, "alice", testStartingHeight, nil, 6)
+	if err != nil {
+		t.Fatalf("unable to create alice server: %v", err)
+	}
+
+	s, err := initSwitchWithDB(testStartingHeight, nil)
+	if err != nil {
+		t.Fatalf("unable to init switch: %v", err)
+	}
+	if err := s.Start(); err != nil {
+		t.Fatalf("unable to start switch: %v", err)
+	}
+	defer s.Stop()
+
+	chanID1, _, aliceChanID, _ := genIDs()
+
+	aliceChannelLink := newMockChannelLink(
+		s, chanID1, aliceChanID, alicePeer, true,
+	)
+	if err := s.AddLink(aliceChannelLink); err != nil {
+		t.Fatalf("unable to add link: %v", err)
+	}
+
+	// Create request which should be forwarder from alice channel link
+	// to bob channel link.
+	preimage, err := genPreimage()
+	if err != nil {
+		t.Fatalf("unable to generate preimage: %v", err)
+	}
+	rhash := fastsha256.Sum256(preimage[:])
+
+	// initialize the payment for this message which is done in the router
+	if err := s.cfg.DB.AddPayment(rhash, 1); err != nil {
+		t.Fatalf("unable to add payment: %v", err)
+	}
+
+	update := &lnwire.UpdateAddHTLC{
+		PaymentHash: rhash,
+		Amount:      1,
+	}
+
+	// Handle the request and checks that bob channel link received it.
+	errChan := make(chan error)
+	preimageChan := make(chan [32]byte)
+
+	go func() {
+		preimage, err := s.SendHTLC(
+			aliceChannelLink.ShortChanID(), update,
+			newMockDeobfuscator())
+		if err != nil {
+			errChan <- err
+		} else {
+			preimageChan <- preimage
+		}
+	}()
+
+	select {
+	case pkt := <-aliceChannelLink.packets:
+		if err := aliceChannelLink.completeCircuit(pkt); err != nil {
+			t.Fatalf("unable to complete payment circuit: %v", err)
+		}
+	case err := <-errChan:
+		t.Fatalf("unable to send payment: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("request was not propagated to destination")
+	}
+
+	if s.numPendingPayments() != 1 {
+		t.Fatal("wrong amount of pending payments")
+	}
+
+	if s.circuits.NumOpen() != 1 {
+		t.Fatal("wrong amount of circuits")
+	}
+
+	// Create settle request pretending that bob link handled the add htlc
+	// request and sent the htlc settle request back. This request should
+	// be forwarded back to Alice link.
+	packet := &htlcPacket{
+		outgoingChanID: aliceChannelLink.ShortChanID(),
+		outgoingHTLCID: 0,
+		amount:         1,
+		htlc: &lnwire.UpdateFulfillHTLC{
+			PaymentPreimage: preimage,
+		},
+	}
+
+	// Handle the request and checks that payment circuit works properly.
+	if err := s.forward(packet); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case returnedPreimage := <-preimageChan:
+		if !bytes.Equal(returnedPreimage[:], preimage[:]) {
+			t.Fatalf("wrong preimage returned: "+
+				"expected %v, got %v", preimage[:], returnedPreimage[:])
+		}
+	case err := <-errChan:
+		t.Fatalf("unable to fulfill circuit: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("request was not propagated to channelPoint")
+	}
+
+	if s.circuits.NumOpen() != 0 {
+		t.Fatal("wrong amount of circuits")
+	}
+
+	if s.numPendingPayments() != 0 {
+		t.Fatal("wrong amount of pending payments")
+	}
+
+	// Check that the preimage was successfully added to the database
+	savedPayments, err := s.cfg.DB.FetchAllPayments()
+	if err != nil {
+		t.Fatalf("unable to retrieve payments: %v", err)
+	}
+	if len(savedPayments) != 1 {
+		t.Fatalf("wrong number of saved payments: "+
+			"expected %v, got %v", 1, len(savedPayments))
+	}
+	savedPayment := savedPayments[0]
+	if !bytes.Equal(savedPayment.PaymentPreimage[:], preimage[:]) {
+		t.Fatalf("wrong preimage: "+
+			"expected %v, got %v", preimage[:], savedPayment.PaymentPreimage[:])
 	}
 }
 

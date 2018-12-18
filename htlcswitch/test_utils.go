@@ -733,6 +733,16 @@ func (n *threeHopNetwork) makePayment(sendingPeer, receivingPeer lnpeer.Peer,
 		}
 	}
 
+	// add the payment to the sender so that it can update the payment
+	// through its progress
+	if err := sender.htlcSwitch.cfg.DB.AddPayment(rhash, htlcAmt); err != nil {
+		paymentErr <- err
+		return &paymentResponse{
+			rhash: rhash,
+			err:   paymentErr,
+		}
+	}
+
 	// Send payment and expose err channel.
 	go func() {
 		_, err := sender.htlcSwitch.SendHTLC(
@@ -785,6 +795,16 @@ func (n *threeHopNetwork) makeExtpreimagePayment(sendingPeer,
 
 	// Check who is last in the route and add invoice to server registry.
 	if err := receiver.registry.AddInvoice(*invoice); err != nil {
+		paymentErr <- err
+		return &paymentResponse{
+			rhash: rhash,
+			err:   paymentErr,
+		}
+	}
+
+	// add the payment to the sender so that it can update the payment
+	// through its progress
+	if err := sender.htlcSwitch.cfg.DB.AddPayment(rhash, htlcAmt); err != nil {
 		paymentErr <- err
 		return &paymentResponse{
 			rhash: rhash,

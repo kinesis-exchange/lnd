@@ -24,6 +24,31 @@ import (
 // be returned by FindRoutes
 const defaultNumRoutes = 10
 
+type mockPaymentDB struct {
+	payments map[[32]byte]lnwire.MilliSatoshi
+
+	paymentRoutes map[[32]byte]*channeldb.OutgoingPaymentRoute
+}
+
+func newMockPaymentDB() *mockPaymentDB {
+	return &mockPaymentDB{
+		payments:      make(map[[32]byte]lnwire.MilliSatoshi),
+		paymentRoutes: make(map[[32]byte]*channeldb.OutgoingPaymentRoute),
+	}
+}
+
+func (d *mockPaymentDB) AddPayment(paymentHash [32]byte,
+	amount lnwire.MilliSatoshi) error {
+	d.payments[paymentHash] = amount
+	return nil
+}
+
+func (d *mockPaymentDB) UpdatePaymentRoute(paymentHash [32]byte,
+	route *channeldb.OutgoingPaymentRoute) error {
+	d.paymentRoutes[paymentHash] = route
+	return nil
+}
+
 type testCtx struct {
 	router *ChannelRouter
 
@@ -34,6 +59,8 @@ type testCtx struct {
 	chain *mockChain
 
 	chainView *mockChainView
+
+	db *mockPaymentDB
 }
 
 func (c *testCtx) RestartRouter() error {
@@ -44,6 +71,7 @@ func (c *testCtx) RestartRouter() error {
 	// With the chainView reset, we'll now re-create the router itself, and
 	// start it.
 	router, err := New(Config{
+		DB:        c.db,
 		Graph:     c.graph,
 		Chain:     c.chain,
 		ChainView: c.chainView,
@@ -82,9 +110,11 @@ func createTestCtxFromGraphInstance(startingHeight uint32, graphInstance *testGr
 	// versions of the chain and channel notifier. As we don't need to test
 	// any p2p functionality, the peer send and switch send messages won't
 	// be populated.
+	db := newMockPaymentDB()
 	chain := newMockChain(startingHeight)
 	chainView := newMockChainView(chain)
 	router, err := New(Config{
+		DB:        db,
 		Graph:     graphInstance.graph,
 		Chain:     chain,
 		ChainView: chainView,
@@ -107,6 +137,7 @@ func createTestCtxFromGraphInstance(startingHeight uint32, graphInstance *testGr
 	}
 
 	ctx := &testCtx{
+		db:        db,
 		router:    router,
 		graph:     graphInstance.graph,
 		aliases:   graphInstance.aliasMap,
@@ -331,6 +362,12 @@ func TestSendPaymentRouteFailureFallback(t *testing.T) {
 		t.Fatalf("unable to send payment: %v", err)
 	}
 
+	// The payment should have been persisted in the database
+	if ctx.db.payments[payment.PaymentHash] != payment.Amount {
+		t.Fatalf("payment was not added with right amount: "+
+			"expected %v, got %v", payment.Amount, ctx.db.payments[payment.PaymentHash])
+	}
+
 	// The route selected should have two hops
 	if len(route.Hops) != 2 {
 		t.Fatalf("incorrect route length: expected %v got %v", 2,
@@ -351,6 +388,33 @@ func TestSendPaymentRouteFailureFallback(t *testing.T) {
 			"instead passes through: %v",
 			getAliasFromPubKey(route.Hops[0].PubKeyBytes[:],
 				ctx.aliases))
+	}
+
+	savedRoute := ctx.db.paymentRoutes[payment.PaymentHash]
+
+	// The payment should have been updated with the taken path
+	if savedRoute == nil {
+		t.Fatalf("payment route was not added to database")
+	}
+	if len(savedRoute.Path) != 2 {
+		t.Fatalf("incorrect saved route length: "+
+			"expected %v, got %v", 2, len(savedRoute.Path))
+	}
+	if !bytes.Equal(savedRoute.Path[0][:],
+		ctx.aliases["satoshi"].SerializeCompressed()) {
+
+		t.Fatalf("route should go through satoshi as first hop, "+
+			"instead passes through: %v",
+			getAliasFromPubKey(savedRoute.Path[0][:],
+				ctx.aliases))
+	}
+	if savedRoute.TimeLockLength != route.TotalTimeLock {
+		t.Fatalf("time lock was not added to database: "+
+			"expected %v, got %v", route.TotalTimeLock, savedRoute.TimeLockLength)
+	}
+	if savedRoute.Fee != route.TotalFees {
+		t.Fatalf("fees were not added to database: "+
+			"expected %v, got %v", route.TotalFees, savedRoute.Fee)
 	}
 }
 
@@ -831,6 +895,32 @@ func TestSendPaymentErrorPathPruning(t *testing.T) {
 	// online (the last error we returned).
 	if !strings.Contains(err.Error(), "UnknownNextPeer") {
 		t.Fatalf("expected UnknownNextPeer instead got: %v", err)
+	}
+
+	// the payment should be saved in the database
+	if ctx.db.payments[payHash] != payment.Amount {
+		t.Fatalf("payment was not added with right amount: "+
+			"expected %v, got %v", payment.Amount, ctx.db.payments[payHash])
+	}
+
+	// the last attempted route should have been persisted to the database.
+	savedRoute := ctx.db.paymentRoutes[payHash]
+
+	// The payment should have been updated with the taken path
+	if savedRoute == nil {
+		t.Fatalf("payment route was not added to database")
+	}
+	if len(savedRoute.Path) != 2 {
+		t.Fatalf("incorrect saved route length: "+
+			"expected %v, got %v", 2, len(savedRoute.Path))
+	}
+	if !bytes.Equal(savedRoute.Path[0][:],
+		ctx.aliases["satoshi"].SerializeCompressed()) {
+
+		t.Fatalf("route should go through satoshi as first hop, "+
+			"instead passes through: %v",
+			getAliasFromPubKey(savedRoute.Path[0][:],
+				ctx.aliases))
 	}
 
 	ctx.router.missionControl.ResetHistory()
