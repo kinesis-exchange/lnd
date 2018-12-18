@@ -119,9 +119,10 @@ type OutgoingPayment struct {
 }
 
 // AddPayment saves an payment to the database and indexes it by payment
-// hash for later retrieval and update. It only includes part of the info
-// that a complete payment has as until it is complete, the route
-// and preimage are unknown.
+// hash for later retrieval and update. Initially it contains only the amount
+// of the payment and its creation date. It's route and preimage are added
+// later in the payment lifecycle in UpdatePaymentRoute and
+// UpdatePaymentPreimage, respecitively.
 func (db *DB) AddPayment(paymentHash [32]byte,
 	amount lnwire.MilliSatoshi) error {
 
