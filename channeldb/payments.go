@@ -21,11 +21,11 @@ var (
 	// feature is used for generating monotonically increasing id.
 	paymentBucket = []byte("payments")
 
-	// paymentIndexBucket is the name of the bucket within the database that
+	// paymentHashIndexBucket is the name of the bucket within the database that
 	// indexes all payments by their payment hash. This index is used to look
 	// up payments by their hash and allow payments to be updated after they
 	// are created.
-	paymentIndexBucket = []byte("payment-index")
+	paymentHashIndexBucket = []byte("payment-hash-index")
 
 	// paymentStatusBucket is the name of the bucket within the database that
 	// stores the status of a payment indexed by the payment's preimage.
@@ -156,14 +156,14 @@ func (db *DB) AddPayment(paymentHash [32]byte,
 			return err
 		}
 
-		paymentIndex, err := tx.CreateBucketIfNotExists(paymentIndexBucket)
+		paymentHashIndex, err := tx.CreateBucketIfNotExists(paymentHashIndexBucket)
 		if err != nil {
 			return err
 		}
 
 		// Ensure that no payment with this hash has already been
 		// stored in the database.
-		paymentIDBytes := paymentIndex.Get(paymentHash[:])
+		paymentIDBytes := paymentHashIndex.Get(paymentHash[:])
 		if paymentIDBytes != nil {
 			return ErrDuplicatePayment
 		}
@@ -182,7 +182,8 @@ func (db *DB) AddPayment(paymentHash [32]byte,
 
 		// Store this payment's sequence number indexed by its hash for
 		// later lookup.
-		if err := paymentIndex.Put(paymentHash[:], paymentIDBytes); err != nil {
+		err = paymentHashIndex.Put(paymentHash[:], paymentIDBytes)
+		if err != nil {
 			return err
 		}
 
@@ -239,14 +240,14 @@ func (db *DB) updatePayment(paymentHash [32]byte,
 			return ErrNoPaymentsCreated
 		}
 
-		paymentIndex := tx.Bucket(paymentIndexBucket)
-		if paymentIndex == nil {
+		paymentHashIndex := tx.Bucket(paymentHashIndexBucket)
+		if paymentHashIndex == nil {
 			return ErrNoPaymentsCreated
 		}
 
 		// Find the ID of the payment in the index so that the payment
 		// itself can be retrieved and updated.
-		paymentIDBytes := paymentIndex.Get(paymentHash[:])
+		paymentIDBytes := paymentHashIndex.Get(paymentHash[:])
 		if paymentIDBytes == nil {
 			return ErrPaymentNotFound
 		}
