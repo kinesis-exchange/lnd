@@ -3935,6 +3935,12 @@ func TestChannelLinkAcceptDuplicatePayment(t *testing.T) {
 		t.Fatalf("unable to add invoice in carol registry: %v", err)
 	}
 
+	err = n.aliceServer.htlcSwitch.cfg.DB.AddPayment(
+		htlc.PaymentHash, htlc.Amount)
+	if err != nil {
+		t.Fatalf("unable to add payment to alice payments db: %v", err)
+	}
+
 	// With the invoice now added to Carol's registry, we'll send the
 	// payment. It should succeed w/o any issues as it has been crafted
 	// properly.
