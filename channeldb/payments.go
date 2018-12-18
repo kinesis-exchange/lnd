@@ -156,6 +156,8 @@ func (db *DB) AddPayment(paymentHash [32]byte,
 			return err
 		}
 
+		// Create the bucket for mapping payment hashes to IDs so that we can
+		// retrieve and update payments later.
 		paymentHashIndex, err := tx.CreateBucketIfNotExists(paymentHashIndexBucket)
 		if err != nil {
 			return err
@@ -226,6 +228,11 @@ func (db *DB) UpdatePaymentPreimage(paymentPreimage [32]byte) error {
 	return db.updatePayment(paymentHash, updatePreimage)
 }
 
+// paymentUpdater is a function passed into updatePayment
+// that modifies a provided OutgoingPayment and returns it.
+// This use of a function to do modification allows us
+// to consolidate the retrieval and saving portions of
+// updating a payment.
 type paymentUpdater func(*OutgoingPayment) *OutgoingPayment
 
 // updatePayment retrieves an existing payment in the database
