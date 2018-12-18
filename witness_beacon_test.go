@@ -18,14 +18,20 @@ import (
 // LookupPreimage in isolation.
 type mockInvoice struct {
 	channeldb.InvoiceTerm
-
 	expectedTimeLock      uint32
 	expectedCurrentHeight uint32
 	expectedClient        extpreimage.Client
 	expectedRegistry      channeldb.InvoiceRegistry
-	preimage              [32]byte
-	tempErr               error
-	permErr               error
+	requestCount          uint64
+	responses             []*mockPreimageResponse
+}
+
+// mockPreimageResponse stores a response to
+// GetPaymentPreimage in order
+type mockPreimageResponse struct {
+	preimage [32]byte
+	tempErr  error
+	permErr  error
 }
 
 // GetPaymentPreimage stubs channeldb.InvoiceTerm.GetPaymentPreimage by
@@ -37,12 +43,17 @@ func (i *mockInvoice) GetPaymentPreimage(timeLock uint32,
 	[32]byte, channeldb.TempPreimageError, channeldb.PermPreimageError) {
 	var zeroPreimage [32]byte
 
-	if i.tempErr != nil {
-		return zeroPreimage, i.tempErr, nil
+	// get the next response to return and increment
+	// so the following request gets another response
+	r := i.responses[i.requestCount]
+	i.requestCount++
+
+	if r.tempErr != nil {
+		return zeroPreimage, r.tempErr, nil
 	}
 
-	if i.permErr != nil {
-		return zeroPreimage, nil, i.permErr
+	if r.permErr != nil {
+		return zeroPreimage, nil, r.permErr
 	}
 
 	if i.expectedTimeLock != timeLock {
@@ -65,7 +76,7 @@ func (i *mockInvoice) GetPaymentPreimage(timeLock uint32,
 			"got %v", i.expectedRegistry, registry)
 	}
 
-	return i.preimage, nil, nil
+	return r.preimage, nil, nil
 }
 
 // mockRegistry implements the htlcswitch.InvoiceDatabase interface
@@ -93,7 +104,158 @@ type mockExtpreimageClient struct {
 	extpreimage.Client
 }
 
+// mockWitnessCache implements the witnessCache interface to check that
+// we are adding preimages to the cache during polling.
+type mockWitnessCache struct {
+	witnessCache
+	witnesses [][]byte
+}
+
+func (w *mockWitnessCache) AddWitness(wType channeldb.WitnessType,
+	witness []byte) error {
+	w.witnesses = append(w.witnesses, witness)
+
+	return nil
+}
+
 func TestLookupPreimage(t *testing.T) {
+	var preimage [32]byte
+	_, err := rand.Read(preimage[:])
+	if err != nil {
+		t.Fatalf("Unable to create preimage: %v", err)
+	}
+
+	hash := sha256.Sum256(preimage[:])
+
+	client := &mockExtpreimageClient{}
+	registry := &mockRegistry{
+		invoices: make(map[chainhash.Hash]*channeldb.Invoice),
+	}
+	wCache := &mockWitnessCache{
+		witnesses: make([][]byte, 0),
+	}
+
+	invoice := &channeldb.Invoice{
+		Memo: hash[:],
+	}
+
+	var invoiceKey chainhash.Hash
+	copy(invoiceKey[:], hash[:])
+	registry.invoices[invoiceKey] = invoice
+
+	tests := []struct {
+		name            string
+		payHash         []byte
+		expectedInvoice channeldb.Invoice
+		invoice         *mockInvoice
+		preimage        []byte
+		hasPreimage     bool
+		andCheck        func() error
+	}{
+		{
+			name:            "preimage is returned",
+			payHash:         hash[:],
+			expectedInvoice: *invoice,
+			invoice: &mockInvoice{
+				expectedTimeLock:      uint32(0),
+				expectedCurrentHeight: uint32(0),
+				expectedClient:        client,
+				expectedRegistry:      registry,
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						preimage: preimage,
+					},
+				},
+			},
+			preimage:    preimage[:],
+			hasPreimage: true,
+		},
+		{
+			name:            "temp error is returned",
+			payHash:         hash[:],
+			expectedInvoice: *invoice,
+			invoice: &mockInvoice{
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						tempErr: fmt.Errorf("fake temp error"),
+					},
+				},
+			},
+			preimage:    nil,
+			hasPreimage: false,
+		},
+		{
+			name:            "perm error is returned",
+			payHash:         hash[:],
+			expectedInvoice: *invoice,
+			invoice: &mockInvoice{
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						permErr: fmt.Errorf("fake perm error"),
+					},
+				},
+			},
+			preimage:    nil,
+			hasPreimage: false,
+		},
+		{
+			name:            "preimage is returned after temp error",
+			payHash:         hash[:],
+			expectedInvoice: *invoice,
+			invoice: &mockInvoice{
+				expectedTimeLock:      uint32(0),
+				expectedCurrentHeight: uint32(0),
+				expectedClient:        client,
+				expectedRegistry:      registry,
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						tempErr: fmt.Errorf("fake temp error"),
+					},
+					&mockPreimageResponse{
+						preimage: preimage,
+					},
+				},
+			},
+			preimage:    nil,
+			hasPreimage: false,
+		},
+	}
+
+	for _, test := range tests {
+
+		// stub castInvoiceTerm so that we can use our mockInvoice, which
+		// implements the channeldb.InvoiceTerm interface
+		revert := castInvoiceTerm
+		defer func() { castInvoiceTerm = revert }()
+		castInvoiceTerm = func(i channeldb.Invoice) channeldb.InvoiceTerm {
+			if !bytes.Equal(i.Memo, test.expectedInvoice.Memo) {
+				t.Fatalf("cast to channeldb.InvoiceTerm failed, "+
+					"expected: %v, got %v", test.expectedInvoice, i)
+			}
+			return test.invoice
+		}
+
+		p := &preimageBeacon{
+			wCache:            wCache,
+			invoices:          registry,
+			extpreimageClient: client,
+		}
+
+		preimage, ok := p.LookupPreimage(test.payHash)
+
+		if ok != test.hasPreimage {
+			t.Errorf("LookupPreimage test \"%s\" failed, got ok: %t, "+
+				"want ok: %t", test.name, ok, test.hasPreimage)
+		}
+
+		if !bytes.Equal(preimage[:], test.preimage[:]) {
+			t.Errorf("LookupPreimage test \"%s\" failed, got preimage: %v, "+
+				"want preimage: %v", test.name, preimage, test.preimage)
+		}
+	}
+}
+
+func TestPollForPreimage(t *testing.T) {
 	var preimage [32]byte
 	_, err := rand.Read(preimage[:])
 	if err != nil {
@@ -120,11 +282,14 @@ func TestLookupPreimage(t *testing.T) {
 		payHash         []byte
 		expectedInvoice channeldb.Invoice
 		invoice         *mockInvoice
-		preimage        []byte
-		hasPreimage     bool
+		wCache          *mockWitnessCache
+		wCacheLen       int
+		wCacheIndex     int
+		wCacheValue     []byte
+		keepPolling     bool
 	}{
 		{
-			name:            "preimage is returned",
+			name:            "preimage",
 			payHash:         hash[:],
 			expectedInvoice: *invoice,
 			invoice: &mockInvoice{
@@ -132,35 +297,62 @@ func TestLookupPreimage(t *testing.T) {
 				expectedCurrentHeight: uint32(0),
 				expectedClient:        client,
 				expectedRegistry:      registry,
-				preimage:              preimage,
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						preimage: preimage,
+					},
+				},
 			},
-			preimage:    preimage[:],
-			hasPreimage: true,
+			wCache: &mockWitnessCache{
+				witnesses: make([][]byte, 0),
+			},
+			wCacheLen:   1,
+			wCacheIndex: 0,
+			wCacheValue: preimage[:],
+			keepPolling: false,
 		},
 		{
-			name:            "temp error is returned",
+			name:            "temp error",
 			payHash:         hash[:],
 			expectedInvoice: *invoice,
 			invoice: &mockInvoice{
-				tempErr: fmt.Errorf("fake temp error"),
+				expectedTimeLock:      uint32(0),
+				expectedCurrentHeight: uint32(0),
+				expectedClient:        client,
+				expectedRegistry:      registry,
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						tempErr: fmt.Errorf("fake temp error"),
+					},
+				},
 			},
-			preimage:    nil,
-			hasPreimage: false,
+			wCache: &mockWitnessCache{
+				witnesses: make([][]byte, 0),
+			},
+			wCacheLen:   0,
+			keepPolling: true,
 		},
 		{
-			name:            "perm error is returned",
+			name:            "perm error",
 			payHash:         hash[:],
 			expectedInvoice: *invoice,
 			invoice: &mockInvoice{
-				permErr: fmt.Errorf("fake perm error"),
+				responses: []*mockPreimageResponse{
+					&mockPreimageResponse{
+						permErr: fmt.Errorf("fake perm error"),
+					},
+				},
 			},
-			preimage:    nil,
-			hasPreimage: false,
+			wCache: &mockWitnessCache{
+				witnesses: make([][]byte, 0),
+			},
+			wCacheLen:   0,
+			keepPolling: false,
 		},
 	}
 
 	for _, test := range tests {
-
+		fmt.Printf("Running test %s", test.name)
 		// stub castInvoiceTerm so that we can use our mockInvoice, which
 		// implements the channeldb.InvoiceTerm interface
 		revert := castInvoiceTerm
@@ -174,20 +366,27 @@ func TestLookupPreimage(t *testing.T) {
 		}
 
 		p := &preimageBeacon{
+			wCache:            test.wCache,
 			invoices:          registry,
 			extpreimageClient: client,
 		}
 
-		preimage, ok := p.LookupPreimage(test.payHash)
+		keepPolling := p.PollForPreimage(test.payHash)
 
-		if ok != test.hasPreimage {
-			t.Errorf("LookupPreimage test \"%s\" failed, got ok: %t, "+
-				"want ok: %t", test.name, ok, test.hasPreimage)
+		if keepPolling != test.keepPolling {
+			t.Errorf("Wrong keepPolling response: expected %t, got %t",
+				test.keepPolling, keepPolling)
 		}
 
-		if !bytes.Equal(preimage[:], test.preimage[:]) {
-			t.Errorf("LookupPreimage test \"%s\" failed, got preimage: %v, "+
-				"want preimage: %v", test.name, preimage, test.preimage)
+		if len(test.wCache.witnesses) != test.wCacheLen {
+			t.Errorf("Wrong size for witness cache: "+
+				"expected %d, got %d", test.wCacheLen, len(test.wCache.witnesses))
+		}
+		if len(test.wCache.witnesses) != 0 &&
+			!bytes.Equal(test.wCache.witnesses[test.wCacheIndex],
+				test.wCacheValue[:]) {
+			t.Errorf("Wrong wCacheValue in cache: expected %v, got %v",
+				test.wCacheValue[:], test.wCache.witnesses[test.wCacheIndex])
 		}
 	}
 }

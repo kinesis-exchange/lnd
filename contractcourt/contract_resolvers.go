@@ -1063,6 +1063,10 @@ func (h *htlcIncomingContestResolver) Resolve() (ContractResolver, error) {
 		return &h.htlcSuccessResolver, nil
 	}
 
+	// set our flag on whether we need to continue polling
+	// our own invoices for preimages
+	keepPolling := true
+
 	for {
 
 		select {
@@ -1098,6 +1102,14 @@ func (h *htlcIncomingContestResolver) Resolve() (ContractResolver, error) {
 					h.htlcExpiry, currentHeight)
 				h.resolved = true
 				return nil, h.Checkpoint(h)
+			}
+
+			// look for the preimage again. This should be unnecessary
+			// because we are subscribed to updates, but in the case
+			// where this is an external preimage and we've encountered
+			// a temporary error we'll want to do this polling.
+			if keepPolling {
+				keepPolling = h.PreimageDB.PollForPreimage(h.payHash[:])
 			}
 
 		case <-h.Quit:

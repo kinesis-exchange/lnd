@@ -326,6 +326,10 @@ var (
 			Entity: "offchain",
 			Action: "read",
 		}},
+		"/lnrpc.Lightning/LookupPaymentStatus": {{
+			Entity: "offchain",
+			Action: "read",
+		}},
 	}
 )
 
