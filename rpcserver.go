@@ -387,8 +387,9 @@ func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	for addr, amt := range addrPairs {
 		fmt.Printf("OK DONT HATE ME")
 		fmt.Printf("%v", activeNetParams.Params)
+		fmt.Printf("%v", activeNetParams)
 
-		addr, err := btcutil.DecodeAddress(addr, activeNetParams)
+		addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
 		if err != nil {
 			return nil, err
 		}
