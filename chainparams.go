@@ -12,7 +12,7 @@ import (
 
 // activeNetParams is a pointer to the parameters specific to the currently
 // active bitcoin network.
-var activeNetParams = bitcoinTestNetParams
+var activeNetParams = bitcoinMainNetParams
 
 // bitcoinNetParams couples the p2p parameters of a network with the
 // corresponding RPC port of a daemon running on the particular network.
@@ -109,7 +109,6 @@ func applyLitecoinParams(params *bitcoinNetParams, litecoinParams *litecoinNetPa
 	params.Net = bitcoinWire.BitcoinNet(litecoinParams.Net)
 	params.DefaultPort = litecoinParams.DefaultPort
 	params.CoinbaseMaturity = litecoinParams.CoinbaseMaturity
-	params.Params = litecoinParams.Params
 
 	copy(params.GenesisHash[:], litecoinParams.GenesisHash[:])
 
