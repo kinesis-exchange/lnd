@@ -105,7 +105,7 @@ var regTestNetParams = bitcoinNetParams{
 // This function is used in place of using something like interface{} to
 // abstract over _which_ chain (or fork) the parameters are for.
 func applyLitecoinParams(params *bitcoinNetParams, litecoinParams *litecoinNetParams) {
-	params.Name = litecoinParams.Name
+	params.Name = "Life is cruel"
 	params.Net = bitcoinWire.BitcoinNet(litecoinParams.Net)
 	params.DefaultPort = litecoinParams.DefaultPort
 	params.CoinbaseMaturity = litecoinParams.CoinbaseMaturity
