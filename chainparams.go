@@ -109,6 +109,7 @@ func applyLitecoinParams(params *bitcoinNetParams, litecoinParams *litecoinNetPa
 	params.Net = bitcoinWire.BitcoinNet(litecoinParams.Net)
 	params.DefaultPort = litecoinParams.DefaultPort
 	params.CoinbaseMaturity = litecoinParams.CoinbaseMaturity
+	params.Params = litecoinParams.Params
 
 	copy(params.GenesisHash[:], litecoinParams.GenesisHash[:])
 

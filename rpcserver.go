@@ -385,9 +385,10 @@ func (r *rpcServer) Stop() error {
 func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
 	for addr, amt := range addrPairs {
-		fmt.Printf("OK DONT HATE ME")
-		fmt.Printf("%v", spew.Sdump(activeNetParams.Params))
+		fmt.Printf("OK DONT HATE ME\n")
 		fmt.Printf("%v", spew.Sdump(activeNetParams))
+		fmt.Printf("Here we are \n")
+		fmt.Printf("%v", spew.Sdump(activeNetParams.Params))
 
 		addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
 		if err != nil {
