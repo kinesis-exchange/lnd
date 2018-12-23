@@ -386,27 +386,31 @@ func (r *rpcServer) Stop() error {
 func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
 	for addr, amt := range addrPairs {
-		var addr
-
-		// we need to decide what map to use here
 		if cfg.Litecoin.Active {
 			addr, err := ltcutil.DecodeAddress(addr, activeNetParams.Params)
 			if err != nil {
 				return nil, err
 			}
+			pkscript, err := txscript.PayToAddrScript(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			outputs = append(outputs, wire.NewTxOut(amt, pkscript))
 		} else {
 			addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
 			if err != nil {
 				return nil, err
 			}
+
+			pkscript, err := txscript.PayToAddrScript(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			outputs = append(outputs, wire.NewTxOut(amt, pkscript))
 		}
 
-		pkscript, err := txscript.PayToAddrScript(addr)
-		if err != nil {
-			return nil, err
-		}
-
-		outputs = append(outputs, wire.NewTxOut(amt, pkscript))
 	}
 
 	return outputs, nil
