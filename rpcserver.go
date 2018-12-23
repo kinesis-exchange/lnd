@@ -388,7 +388,7 @@ func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
 	for addr, amt := range addrPairs {
 		if cfg.Litecoin.Active {
-			addr, err := ltcutil.DecodeAddress(addr, activeNetParams.Params)
+			addr, err := ltcutil.DecodeAddress(addr, litecoinRegTestNetParams.Params)
 			if err != nil {
 				return nil, err
 			}
