@@ -18,7 +18,6 @@ import (
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwallet/waddrmgr"
@@ -387,32 +386,17 @@ func (r *rpcServer) Stop() error {
 func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
 	for addr, amt := range addrPairs {
-		if cfg.Litecoin.Active {
-			addr, err := ltcutil.DecodeAddress(addr, litecoinRegTestNetParams.Params)
-			if err != nil {
-				return nil, err
-			}
-
-			pkscript, err := txscriptLtc.PayToAddrScript(addr)
-			if err != nil {
-				return nil, err
-			}
-
-			outputs = append(outputs, wire.NewTxOut(amt, pkscript))
-		} else {
-			addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
-			if err != nil {
-				return nil, err
-			}
-
-			pkscript, err := txscript.PayToAddrScript(addr)
-			if err != nil {
-				return nil, err
-			}
-
-			outputs = append(outputs, wire.NewTxOut(amt, pkscript))
+		addr, err := ltcutil.DecodeAddress(addr, litecoinRegTestNetParams.Params)
+		if err != nil {
+			return nil, err
 		}
 
+		pkscript, err := txscriptLtc.PayToAddrScript(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		outputs = append(outputs, wire.NewTxOut(amt, pkscript))
 	}
 
 	return outputs, nil
