@@ -391,7 +391,9 @@ func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 			if err != nil {
 				return nil, err
 			}
-			pkscript, err := txscript.PayToAddrScript(addr)
+
+			var convertedAddr btcutil.Address = addr
+			pkscript, err := txscript.PayToAddrScript(convertedAddr)
 			if err != nil {
 				return nil, err
 			}
