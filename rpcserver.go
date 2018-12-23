@@ -22,7 +22,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwallet/waddrmgr"
-	"github.com/coreos/bbolt"
+	bolt "github.com/coreos/bbolt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/build"
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -33,6 +33,7 @@ import (
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/signal"
 	"github.com/lightningnetwork/lnd/zpay32"
+	"github.com/ltcsuite/ltcutil"
 	"github.com/tv42/zbase32"
 	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -385,9 +386,19 @@ func (r *rpcServer) Stop() error {
 func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
 	for addr, amt := range addrPairs {
-		addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
-		if err != nil {
-			return nil, err
+		var addr
+
+		// we need to decide what map to use here
+		if cfg.Litecoin.Active {
+			addr, err := ltcutil.DecodeAddress(addr, activeNetParams.Params)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		pkscript, err := txscript.PayToAddrScript(addr)
