@@ -22,6 +22,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwallet/waddrmgr"
+	txscriptLtc "github.com/btcsuite/ltcd/txscript"
 	bolt "github.com/coreos/bbolt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/build"
@@ -392,8 +393,7 @@ func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 				return nil, err
 			}
 
-			var convertedAddr btcutil.Address = addr
-			pkscript, err := txscript.PayToAddrScript(convertedAddr)
+			pkscript, err := txscriptLtc.PayToAddrScript(addr)
 			if err != nil {
 				return nil, err
 			}
