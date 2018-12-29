@@ -125,3 +125,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+    name = "github.com/sparkswap/btcutil"
+    revision = "bfad32d2f123951fd51eb9d54622aa12a87192be"
