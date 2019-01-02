@@ -125,3 +125,7 @@
 [[constraint]]
   name = "github.com/ltcsuite/ltcd"
   revision = "f37f8bf35796325487af28e0e01c2528dd97ea95"
+
+[[constraint]]
+    name = "github.com/sparkswap/btcutil"
+    revision = "bfad32d2f123951fd51eb9d54622aa12a87192be"

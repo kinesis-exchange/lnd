@@ -22,7 +22,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcwallet/waddrmgr"
-	"github.com/coreos/bbolt"
+	bolt "github.com/coreos/bbolt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/lightningnetwork/lnd/build"
 	"github.com/lightningnetwork/lnd/channeldb"
@@ -33,6 +33,7 @@ import (
 	"github.com/lightningnetwork/lnd/routing"
 	"github.com/lightningnetwork/lnd/signal"
 	"github.com/lightningnetwork/lnd/zpay32"
+	sparkswapbtcutil "github.com/sparkswap/btcutil"
 	"github.com/tv42/zbase32"
 	"golang.org/x/net/context"
 	"gopkg.in/macaroon-bakery.v2/bakery"
@@ -384,8 +385,11 @@ func (r *rpcServer) Stop() error {
 // to be used within the constructed output(s).
 func addrPairsToOutputs(addrPairs map[string]int64) ([]*wire.TxOut, error) {
 	outputs := make([]*wire.TxOut, 0, len(addrPairs))
-	for addr, amt := range addrPairs {
-		addr, err := btcutil.DecodeAddress(addr, activeNetParams.Params)
+	for walletAddr, amt := range addrPairs {
+		// We've (sparkswap) have had to modify DecodeAddress for litecoin mainnet
+		// because DecodeAddress uses references to `chaincfg` which uses btc values
+		// instead of litecoin values when checking an address type
+		addr, err := sparkswapbtcutil.DecodeAddress(walletAddr, activeNetParams.Params)
 		if err != nil {
 			return nil, err
 		}
@@ -2644,7 +2648,10 @@ func (r *rpcServer) AddInvoice(ctx context.Context,
 
 	// If specified, add a fallback address to the payment request.
 	if len(invoice.FallbackAddr) > 0 {
-		addr, err := btcutil.DecodeAddress(invoice.FallbackAddr,
+		// We've (sparkswap) have had to modify DecodeAddress for litecoin mainnet
+		// because DecodeAddress uses references to `chaincfg` which uses btc values
+		// instead of litecoin values when checking an address type
+		addr, err := sparkswapbtcutil.DecodeAddress(invoice.FallbackAddr,
 			activeNetParams.Params)
 		if err != nil {
 			return nil, fmt.Errorf("invalid fallback address: %v",
