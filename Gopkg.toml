@@ -51,10 +51,6 @@
   revision = "ac4d9da8f1d67c95f1fafdc65e1a4902d6f5a940"
 
 [[constraint]]
-  name = "github.com/ltcsuite/ltcd"
-  revision = "01737289d815e0e32c91e55593ba2fbd8d090b2c"
-
-[[constraint]]
   name = "github.com/miekg/dns"
   revision = "79bfde677fa81ff8d27c4330c35bda075d360641"
 
@@ -125,3 +121,7 @@
 [prune]
   go-tests = true
   unused-packages = true
+
+[[constraint]]
+  name = "github.com/ltcsuite/ltcd"
+  revision = "f37f8bf35796325487af28e0e01c2528dd97ea95"
