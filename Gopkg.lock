@@ -298,7 +298,6 @@
   revision = "ac4d9da8f1d67c95f1fafdc65e1a4902d6f5a940"
 
 [[projects]]
-  branch = "master"
   digest = "1:499808df2d0ec0229f9dae95871a0893346228280a6beb26dd0b1d5c4650471b"
   name = "github.com/ltcsuite/ltcd"
   packages = [
