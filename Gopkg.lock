@@ -298,7 +298,7 @@
   revision = "ac4d9da8f1d67c95f1fafdc65e1a4902d6f5a940"
 
 [[projects]]
-  digest = "1:81e36f059f2dfe7a5c07d55cabf8a7f0183f22d75bb6daa9b2935855bdd7c6af"
+  digest = "1:499808df2d0ec0229f9dae95871a0893346228280a6beb26dd0b1d5c4650471b"
   name = "github.com/ltcsuite/ltcd"
   packages = [
     "chaincfg",
@@ -306,7 +306,7 @@
     "wire",
   ]
   pruneopts = "UT"
-  revision = "01737289d815e0e32c91e55593ba2fbd8d090b2c"
+  revision = "f37f8bf35796325487af28e0e01c2528dd97ea95"
 
 [[projects]]
   digest = "1:a0bf6f18ffeb4a45fd00d5eb16d918769bbe0e2dc7824e95abf05a3306f60102"
