@@ -319,7 +319,9 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 					if cfg.Bitcoin.Active && cfg.Bitcoin.RegTest {
 						rpcPort = 18443
 					} else if cfg.Litecoin.Active && cfg.Litecoin.RegTest {
-						rpcPort = 19334
+						// The default port in ltcd is 19334, however litecoind has a default
+						// rpc port of 19443
+						rpcPort = 19443
 					}
 
 					bitcoindHost = fmt.Sprintf("%v:%d", bitcoindMode.RPCHost, rpcPort)
