@@ -298,14 +298,15 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			if err != nil {
 				return nil, nil, err
 			}
-			// We have absolutely no idea why this was a good idea however this will
-			// change ports for different networks by 2.
+			// We have absolutely no idea why this this is here however this will change
+			// ports for different networks by 2. This only occurs for bitcoind/litecoind.
+			//
 			// ex: 18444 will become 18442
 			rpcPort -= 2
 
 			// Set the bitcoindHost here so that we can test if the connection works
 			// in the case of regtest. If the connection is bad then we will attempt
-			// use a different port for the host
+			// to use a different port for the host
 			bitcoindHost = fmt.Sprintf("%v:%d", bitcoindMode.RPCHost, rpcPort)
 
 			if (cfg.Bitcoin.Active && cfg.Bitcoin.RegTest) ||
@@ -319,8 +320,8 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 					if cfg.Bitcoin.Active && cfg.Bitcoin.RegTest {
 						rpcPort = 18443
 					} else if cfg.Litecoin.Active && cfg.Litecoin.RegTest {
-						// The default port in ltcd is 19334, however litecoind has a default
-						// rpc port of 19443
+						// The default port in ltcd is 19334, however litecoind has different
+						// default port set to 19443
 						rpcPort = 19443
 					}
 
