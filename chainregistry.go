@@ -298,16 +298,31 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			if err != nil {
 				return nil, nil, err
 			}
+
+			// This port change only effects bitcoind/litecoind on testnet/simnet/mainnet
+			// ex: 18444 will become 18442
 			rpcPort -= 2
-			bitcoindHost = fmt.Sprintf("%v:%d",
-				bitcoindMode.RPCHost, rpcPort)
-			if cfg.Bitcoin.Active && cfg.Bitcoin.RegTest {
+
+			// Set the bitcoindHost here so that we can test if the connection works
+			// in the case of regtest. If the connection is bad then we will attempt
+			// to use a different port for the host
+			bitcoindHost = fmt.Sprintf("%v:%d", bitcoindMode.RPCHost, rpcPort)
+
+			if (cfg.Bitcoin.Active && cfg.Bitcoin.RegTest) ||
+				(cfg.Litecoin.Active && cfg.Litecoin.RegTest) {
+
 				conn, err := net.Dial("tcp", bitcoindHost)
 				if err != nil || conn == nil {
-					rpcPort = 18443
-					bitcoindHost = fmt.Sprintf("%v:%d",
-						bitcoindMode.RPCHost,
-						rpcPort)
+
+					// For Regtest we will set the ports explicitly as the port change above
+					// only works for simnet, testnet, mainnet
+					if cfg.Bitcoin.Active && cfg.Bitcoin.RegTest {
+						rpcPort = 18443
+					} else if cfg.Litecoin.Active && cfg.Litecoin.RegTest {
+						rpcPort = 19443
+					}
+
+					bitcoindHost = fmt.Sprintf("%v:%d", bitcoindMode.RPCHost, rpcPort)
 				} else {
 					conn.Close()
 				}

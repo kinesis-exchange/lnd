@@ -89,7 +89,7 @@ var litecoinSimNetParams = litecoinNetParams{
 // regtest on ltc, however litecoind/ltcd has param information for this setup
 var litecoinRegTestNetParams = litecoinNetParams{
 	Params:   &litecoinCfg.RegressionNetParams,
-	rpcPort:  "18334",
+	rpcPort:  "19334",
 	CoinType: keychain.CoinTypeTestnet,
 }
 
