@@ -298,9 +298,8 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 			if err != nil {
 				return nil, nil, err
 			}
-			// We have absolutely no idea why this this is here however this will change
-			// ports for different networks by 2. This only occurs for bitcoind/litecoind.
-			//
+
+			// This port change only effects bitcoind/litecoind on testnet/simnet/mainnet
 			// ex: 18444 will become 18442
 			rpcPort -= 2
 
@@ -315,13 +314,11 @@ func newChainControlFromConfig(cfg *config, chanDB *channeldb.DB,
 				conn, err := net.Dial("tcp", bitcoindHost)
 				if err != nil || conn == nil {
 
-					// For Regtest we will set the ports in accordance to the chainparams for
-					// the specified network
+					// For Regtest we will set the ports explicitly as the port change above
+					// only works for simnet, testnet, mainnet
 					if cfg.Bitcoin.Active && cfg.Bitcoin.RegTest {
 						rpcPort = 18443
 					} else if cfg.Litecoin.Active && cfg.Litecoin.RegTest {
-						// The default port in ltcd is 19334, however litecoind has different
-						// default port set to 19443
 						rpcPort = 19443
 					}
 
