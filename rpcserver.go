@@ -3190,6 +3190,8 @@ func (r *rpcServer) GetTransactions(ctx context.Context,
 			blockHash = tx.BlockHash.String()
 		}
 
+		fmt.Printf("Here is the value of fees: %v", tx.TotalFees)
+
 		txDetails.Transactions[i] = &lnrpc.Transaction{
 			TxHash:           tx.Hash.String(),
 			Amount:           int64(tx.Value),
