@@ -553,6 +553,7 @@ func (c *chainWatcher) dispatchCooperativeClose(commitSpend *chainntnfs.SpendDet
 		RemoteCurrentRevocation: c.cfg.chanState.RemoteCurrentRevocation,
 		RemoteNextRevocation:    c.cfg.chanState.RemoteNextRevocation,
 		LocalChanConfig:         c.cfg.chanState.LocalChanCfg,
+		IsInitiator:             c.cfg.chanState.IsInitiator,
 	}
 
 	// Attempt to add a channel sync message to the close summary.
@@ -618,6 +619,7 @@ func (c *chainWatcher) dispatchLocalForceClose(
 		RemoteCurrentRevocation: c.cfg.chanState.RemoteCurrentRevocation,
 		RemoteNextRevocation:    c.cfg.chanState.RemoteNextRevocation,
 		LocalChanConfig:         c.cfg.chanState.LocalChanCfg,
+		IsInitiator:             c.cfg.chanState.IsInitiator,
 	}
 
 	// If our commitment output isn't dust or we have active HTLC's on the
@@ -798,6 +800,7 @@ func (c *chainWatcher) dispatchContractBreach(spendEvent *chainntnfs.SpendDetail
 		RemoteCurrentRevocation: c.cfg.chanState.RemoteCurrentRevocation,
 		RemoteNextRevocation:    c.cfg.chanState.RemoteNextRevocation,
 		LocalChanConfig:         c.cfg.chanState.LocalChanCfg,
+		IsInitiator:             c.cfg.chanState.IsInitiator,
 	}
 
 	// Attempt to add a channel sync message to the close summary.

@@ -1011,6 +1011,9 @@ message ChannelCloseSummary {
 
     /// Details on how the channel was closed.
     ClosureType close_type = 10 [json_name = "close_type"];
+
+    // True if we were the ones that created the channel.
+	bool initiator = 11 [json_name = "initiator"];
 }
 
 message ClosedChannelsRequest {

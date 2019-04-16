@@ -1294,6 +1294,7 @@ func (r *rpcServer) AbandonChannel(ctx context.Context,
 		RemoteCurrentRevocation: dbChan.RemoteCurrentRevocation,
 		RemoteNextRevocation:    dbChan.RemoteNextRevocation,
 		LocalChanConfig:         dbChan.LocalChanCfg,
+		IsInitiator:             dbChan.IsInitiator,
 	}
 
 	// Finally, we'll close the channel in the DB, and return back to the
@@ -1819,6 +1820,7 @@ func (r *rpcServer) ClosedChannels(ctx context.Context,
 			TimeLockedBalance: int64(dbChannel.TimeLockedBalance),
 			ChainHash:         dbChannel.ChainHash.String(),
 			ClosingTxHash:     dbChannel.ClosingTXID.String(),
+			Initiator:         dbChannel.IsInitiator,
 		}
 
 		resp.Channels = append(resp.Channels, channel)

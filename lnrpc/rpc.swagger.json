@@ -1395,6 +1395,11 @@
         "close_type": {
           "$ref": "#/definitions/ChannelCloseSummaryClosureType",
           "description": "/ Details on how the channel was closed."
+        },
+        "initiator": {
+          "type": "boolean",
+          "format": "boolean",
+          "description": "True if we were the ones that created the channel."
         }
       }
     },

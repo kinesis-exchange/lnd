@@ -12,7 +12,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/coreos/bbolt"
+	bolt "github.com/coreos/bbolt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-errors/errors"
 	"github.com/lightningnetwork/lnd/chainntnfs"
@@ -533,6 +533,7 @@ func (f *fundingManager) Start() error {
 					RemoteCurrentRevocation: ch.RemoteCurrentRevocation,
 					RemoteNextRevocation:    ch.RemoteNextRevocation,
 					LocalChanConfig:         ch.LocalChanCfg,
+					IsInitiator:             ch.IsInitiator,
 				}
 
 				if err := ch.CloseChannel(closeInfo); err != nil {
@@ -1405,6 +1406,7 @@ func (f *fundingManager) handleFundingCreated(fmsg *fundingCreatedMsg) {
 			RemoteCurrentRevocation: completeChan.RemoteCurrentRevocation,
 			RemoteNextRevocation:    completeChan.RemoteNextRevocation,
 			LocalChanConfig:         completeChan.LocalChanCfg,
+			IsInitiator:             completeChan.IsInitiator,
 		}
 
 		if err := completeChan.CloseChannel(closeInfo); err != nil {

@@ -13,7 +13,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
-	"github.com/coreos/bbolt"
+	bolt "github.com/coreos/bbolt"
 	"github.com/lightningnetwork/lnd/keychain"
 	"github.com/lightningnetwork/lnd/lnwire"
 	"github.com/lightningnetwork/lnd/shachain"
@@ -1837,6 +1837,10 @@ type ChannelCloseSummary struct {
 	// LastChanSyncMsg is the ChannelReestablish message for this channel
 	// for the state at the point where it was closed.
 	LastChanSyncMsg *lnwire.ChannelReestablish
+
+	// IsInitiator is a bool which indicates if we were the original
+	// initiator for the channel.
+	IsInitiator bool
 }
 
 // CloseChannel closes a previously active Lightning channel. Closing a channel
@@ -2133,7 +2137,7 @@ func deserializeCloseChannelSummary(r io.Reader) (*ChannelCloseSummary, error) {
 	err := ReadElements(r,
 		&c.ChanPoint, &c.ShortChanID, &c.ChainHash, &c.ClosingTXID,
 		&c.CloseHeight, &c.RemotePub, &c.Capacity, &c.SettledBalance,
-		&c.TimeLockedBalance, &c.CloseType, &c.IsPending,
+		&c.TimeLockedBalance, &c.CloseType, &c.IsPending, &c.IsInitiator,
 	)
 	if err != nil {
 		return nil, err
