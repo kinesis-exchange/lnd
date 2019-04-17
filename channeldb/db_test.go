@@ -111,6 +111,7 @@ func TestFetchClosedChannelForID(t *testing.T) {
 			ChanPoint:      state.FundingOutpoint,
 			RemotePub:      state.IdentityPub,
 			SettledBalance: btcutil.Amount(500 + i),
+			IsInitiator:    state.IsInitiator,
 		}
 		if err := state.CloseChannel(closeSummary); err != nil {
 			t.Fatalf("unable to close channel: %v", err)

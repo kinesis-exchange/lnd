@@ -330,6 +330,7 @@ func TestOpenChannelPutGetDelete(t *testing.T) {
 		TimeLockedBalance: btcutil.Amount(10000),
 		IsPending:         false,
 		CloseType:         CooperativeClose,
+		IsInitiator:       state.IsInitiator,
 	}
 	if err := state.CloseChannel(closeSummary); err != nil {
 		t.Fatalf("unable to close channel: %v", err)
@@ -627,6 +628,7 @@ func TestChannelStateTransition(t *testing.T) {
 		TimeLockedBalance: btcutil.Amount(10000),
 		IsPending:         false,
 		CloseType:         RemoteForceClose,
+		IsInitiator:       channel.IsInitiator,
 	}
 	if err := updatedChannel[0].CloseChannel(closeSummary); err != nil {
 		t.Fatalf("unable to delete updated channel: %v", err)
@@ -793,6 +795,7 @@ func TestFetchClosedChannels(t *testing.T) {
 		CloseType:         RemoteForceClose,
 		IsPending:         true,
 		LocalChanConfig:   state.LocalChanCfg,
+		IsInitiator:       state.IsInitiator,
 	}
 	if err := state.CloseChannel(summary); err != nil {
 		t.Fatalf("unable to close channel: %v", err)
