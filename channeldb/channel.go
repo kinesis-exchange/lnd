@@ -2059,7 +2059,7 @@ func serializeChannelCloseSummary(w io.Writer, cs *ChannelCloseSummary) error {
 	err := WriteElements(w,
 		cs.ChanPoint, cs.ShortChanID, cs.ChainHash, cs.ClosingTXID,
 		cs.CloseHeight, cs.RemotePub, cs.Capacity, cs.SettledBalance,
-		cs.TimeLockedBalance, cs.CloseType, cs.IsPending,
+		cs.TimeLockedBalance, cs.CloseType, cs.IsPending, cs.IsInitiator,
 	)
 	if err != nil {
 		return err
